@@ -1,5 +1,13 @@
 <template>
 	<view class="page">
+		<!--
+			Sprint 5.2：显式返回按钮
+			删掉 uni-id-pages 后，本页改用原生导航栏 ——
+			但在 H5/Web 端原生导航栏常不渲染返回按钮，页面成了「死胡同」。
+			这里用自研的 nav-bar 组件补一个始终可见的返回入口。
+		-->
+		<nav-bar title="个人资料" />
+
 		<!-- 头部资料卡 -->
 		<view class="profile-card">
 			<view class="avatar-wrap" @click="pickAvatar">
@@ -88,8 +96,10 @@ import { getUserInfo, setUserInfo } from '@/utils/request.js'
 import { audit } from '@/utils/session.js'
 import { upload } from '@/utils/request.js'
 import { checkAuth } from '@/utils/router-guard.js'
+import NavBar from '@/components/nav-bar/nav-bar.vue'
 
 export default {
+	components: { NavBar },
 	data () {
 		return {
 			user: {},

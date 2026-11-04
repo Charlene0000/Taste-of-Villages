@@ -139,10 +139,25 @@ function searchKnowledge (question) {
 /**
  * 生成回答
  *
- * 优先级：
+ * 优先级（Sprint 5.2 调整）：
  *   1. 知识库命中 → 直接返回（零外部依赖，最快最准）
- *   2. DeepSeek 已配置 → 调用 LLM
- *   3. 都没命中 → 返回能力清单（降级，不胡编）
+ *   2. **Agent 编排层** → planner 识别意图 → executor 调工具
+ *      （新增：处理「我是谁」「几点了」这类需要实时数据的问题）
+ *   3. DeepSeek 已配置 → 调用 LLM
+ *   4. 都没命中 → 返回能力清单（降级，不胡编）
+ *
+ * ## 为什么加第 2 步
+ * ----------------
+ * Sprint 5.1 之前，知识库未命中就直接降级。
+ * 于是「我是谁」「几点了」「我登录了几次」全部返回兜底话术 ——
+ * 因为这些问题的答案**不在知识库里，而在运行时数据里**。
+ *
+ * 编排层（planner + executor）正是为此设计的：
+ *   user-stats  → 查当前用户（手机号/昵称/登录次数）
+ *   server-time → 查服务器时间
+ *
+ * 注意：这不改变「零外部依赖」的性质 ——
+ * 编排层与工具全部是本地 JS 与本地数据库查询。
  *
  * @param {string} question
  * @param {Object} context
@@ -162,7 +177,30 @@ async function answer (question, context = {}) {
 		}
 	}
 
-	// ② LLM（可选）
+	// ② Agent 编排层（Sprint 5.2 新增）
+	//    知识库没有的、但运行时能算出来的，交给 planner + executor。
+	try {
+		const orchestrated = await runAgent(question, {
+			user: context.user || null,
+			userId: context.userId || null
+		})
+
+		if (orchestrated && orchestrated.type === 'tool-result' && orchestrated.answer) {
+			return {
+				code: 200,
+				source: 'agent-orchestration',
+				answer: orchestrated.answer,
+				plan: orchestrated.plan,
+				results: orchestrated.results,
+				durationMs: Date.now() - startedAt
+			}
+		}
+	} catch (e) {
+		// 编排失败不影响主流程，继续往下走
+		console.error('[agent] 编排层执行失败:', e.message)
+	}
+
+	// ③ LLM（可选）
 	if (isServiceEnabled('deepseek')) {
 		try {
 			const reply = await callDeepSeek(question, context)
@@ -177,7 +215,7 @@ async function answer (question, context = {}) {
 		}
 	}
 
-	// ③ 降级：能力清单
+	// ④ 降级：能力清单
 	const fb = fallback.reply({ reason: 'no-intent-matched' })
 	return {
 		code: 200,

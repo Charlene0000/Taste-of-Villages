@@ -1,5 +1,8 @@
 <template>
 	<view class="page">
+		<!-- Sprint 5.2：显式返回按钮（原生导航栏在 Web 端不渲染返回键） -->
+		<nav-bar title="数字人演示" />
+
 		<view class="header">
 			<text class="title">数字人演示</text>
 			<text class="subtitle">自研 Canvas 2D · 无 Live2D · 无模型文件</text>
@@ -80,8 +83,10 @@
 import { CanvasAvatar } from '@/digital-avatar/renderer/canvas-avatar'
 import { AvatarController } from '@/digital-avatar/controller/avatar-controller'
 import { noop as noopTts } from '@/digital-avatar/adapters/tts-adapter'
+import NavBar from '@/components/nav-bar/nav-bar.vue'
 
 export default {
+	components: { NavBar },
 	data () {
 		return {
 			text: '你好世界',

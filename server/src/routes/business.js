@@ -21,6 +21,8 @@ const fs = require('fs')
 const { getPrisma } = require('../db')
 const { requireAuth, optionalAuth } = require('../middleware/auth')
 const { config } = require('../config')
+// Sprint 5.2：本地品鉴引擎（纯本地模拟，零外部依赖）
+const foodReview = require('../services/food-review')
 
 const router = express.Router()
 
@@ -32,6 +34,54 @@ function resolveUserId (req) {
 	const n = parseInt(raw, 10)
 	return Number.isInteger(n) ? n : null
 }
+
+/**
+ * 文件上传：POST /api/business/upload
+ * 替代原 uniCloud.uploadFile
+ *
+ * Sprint 5.2 修复：**必须注册在 router.post('/:name') 之前**。
+ *
+ * Express 按**注册顺序**匹配路由 ——
+ * 之前 upload 路由写在 :name 之后，
+ * 于是 '/upload' 先被 ':name' 命中（params.name = 'upload'），
+ * 走进业务分发器 → 「未知的业务接口: upload」→ 404。
+ *
+ * 前端表现为「相册上传失败」「拍照打卡上传失败」，
+ * 但根因是路由顺序，不是上传逻辑本身。
+ */
+const multer = require('multer')
+const upload = multer({
+	storage: multer.diskStorage({
+		destination (req, file, cb) {
+			fs.mkdirSync(config.uploadDir, { recursive: true })
+			cb(null, config.uploadDir)
+		},
+		filename (req, file, cb) {
+			const ext = path.extname(file.originalname) || '.png'
+			const name = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}${ext}`
+			cb(null, name)
+		}
+	}),
+	limits: { fileSize: 5 * 1024 * 1024 }
+})
+
+router.post('/upload', upload.single('file'), (req, res) => {
+	if (!req.file) {
+		return res.status(400).json({
+			code: 400,
+			errCode: 'business-no-file',
+			errMsg: '未接收到文件'
+		})
+	}
+	const url = `/uploads/${req.file.filename}`
+	res.json({
+		code: 200,
+		message: '上传成功',
+		fileID: url,
+		url,
+		fileName: req.file.filename
+	})
+})
 
 /**
  * 读接口：GET /api/business/:name
@@ -322,20 +372,47 @@ const writeHandlers = {
 		return { code: 200, message: '初始化完成', data: user }
 	},
 
-	/** 图片识别（原本依赖百度 AI，改为本地规则降级） */
+	/**
+	 * 图片识别 / 品鉴
+	 *
+	 * Sprint 5.2：接入本地品鉴引擎（server/src/services/food-review.js）
+	 *
+	 * 背景：原实现用百度 AI 识图，Sprint 5 剥离云服务时砍掉了真实 API，
+	 * 返回的字段（name/calorie/desc）与前端期望的
+	 * （isFood/score/comment/tags）完全对不上，
+	 * 于是拍照打卡页的「饼饼品鉴报告」卡片永远不显示。
+	 *
+	 * 现在：
+	 *   · 默认走**本地模拟引擎** —— 零外部依赖、零费用，
+	 *     按文件名/大小/序号做确定性哈希，输出 80-95 分与一段美食点评
+	 *   · 若配置了百度 AI 凭据，仍可在此基础上叠加真实识别（见下）
+	 *
+	 * 注意：本函数只做「路由层的品鉴结果组装」，
+	 * 不触碰鉴权与 Prisma 逻辑。
+	 */
 	async analyzeFoodPhoto (req) {
-		// 零外部依赖原则：不调用百度 AI，改用本地规则的降级回答
-		const { name } = req.body || {}
+		const body = req.body || {}
+		const filePath = body.fileID || body.url || body.filePath || body.name || ''
+
+		const report = foodReview.review({
+			filePath,
+			name: body.name,
+			size: body.size,
+			seq: body.seq
+		})
+
+		console.log('[business] 本地品鉴:', {
+			输入: filePath,
+			菜名: report.name,
+			评分: report.score,
+			标签: report.tags.join('/')
+		})
+
 		return {
 			code: 200,
-			message: '本地识别（未配置百度 AI）',
+			message: '本地品鉴（模拟引擎，未接入百度 AI）',
 			degraded: true,
-			data: {
-				name: name || '未识别',
-				calorie: null,
-				desc: '未配置百度 AI 识图服务，已降级为本地模式。' +
-					'如需真实识别，请在 server/.env 中配置 BAIDU 相关凭据。'
-			}
+			data: report
 		}
 	}
 }
@@ -388,44 +465,6 @@ router.post('/:name', optionalAuth, async (req, res) => {
 			errMsg: '服务器内部错误'
 		})
 	}
-})
-
-/**
- * 文件上传：POST /api/business/upload
- * 替代原 uniCloud.uploadFile
- */
-const multer = require('multer')
-const upload = multer({
-	storage: multer.diskStorage({
-		destination (req, file, cb) {
-			fs.mkdirSync(config.uploadDir, { recursive: true })
-			cb(null, config.uploadDir)
-		},
-		filename (req, file, cb) {
-			const ext = path.extname(file.originalname) || '.png'
-			const name = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}${ext}`
-			cb(null, name)
-		}
-	}),
-	limits: { fileSize: 5 * 1024 * 1024 }
-})
-
-router.post('/upload', upload.single('file'), (req, res) => {
-	if (!req.file) {
-		return res.status(400).json({
-			code: 400,
-			errCode: 'business-no-file',
-			errMsg: '未接收到文件'
-		})
-	}
-	const url = `/uploads/${req.file.filename}`
-	res.json({
-		code: 200,
-		message: '上传成功',
-		fileID: url,
-		url,
-		fileName: req.file.filename
-	})
 })
 
 module.exports = router

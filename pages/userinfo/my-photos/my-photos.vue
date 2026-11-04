@@ -13,13 +13,37 @@
     </view>
     
     <view class="content">
-      <view class="empty-state" v-if="photosList.length === 0">
+      <!--
+        Sprint 5.2：区分「加载中 / 未登录 / 空相册 / 加载失败」四种状态
+        原实现只有一个 v-if="photosList.length === 0"，
+        未登录或加载失败时也显示「相册还是空的」—— 用户会误以为数据丢了。
+      -->
+      <view class="empty-state" v-if="loading">
+        <view class="empty-icon">⏳</view>
+        <text class="empty-text">加载中...</text>
+        <text class="empty-desc">正在读取你的美食时光</text>
+      </view>
+
+      <view class="empty-state" v-else-if="!isLoggedIn">
+        <view class="empty-icon">🔑</view>
+        <text class="empty-text">请先登录</text>
+        <text class="empty-desc">登录后即可查看你的美食相册</text>
+        <button class="empty-btn" size="mini" @click="goLogin">去登录</button>
+      </view>
+
+      <view class="empty-state" v-else-if="loadError">
+        <view class="empty-icon">😢</view>
+        <text class="empty-text">加载失败</text>
+        <text class="empty-desc">{{ loadError }}</text>
+        <button class="empty-btn" size="mini" @click="loadPhotosList">重试</button>
+      </view>
+
+      <view class="empty-state" v-else-if="photosList.length === 0">
         <view class="empty-icon">🍽️</view>
         <text class="empty-text">相册还是空的</text>
         <text class="empty-desc">记录你的美食时光</text>
-
       </view>
-      
+
       <view class="photos-grid" v-else>
         <view class="photo-item" v-for="(photo, index) in photosList" :key="index" @click="viewPhoto(photo, index)">
            <view class="img-wrapper">
@@ -32,7 +56,7 @@
                 <view class="like-badge">❤️ {{ photo.likes || 0 }}</view>
             </view>
           </view>
-          
+
           <view class="photo-actions">
             <view class="action-icon" @click.stop="editPhoto(photo)">
               <text>✏️</text>
@@ -71,7 +95,11 @@ export default {
   data() {
     return {
       currentPhoto: {},
-      photosList: []
+      photosList: [],
+      // Sprint 5.2：加载状态
+      loading: true,
+      loadError: '',
+      isLoggedIn: false
     }
   },
   onLoad() {
@@ -86,25 +114,53 @@ export default {
   methods: {
     
     async loadPhotosList() {
+      this.loading = true;
+      this.loadError = '';
       try {
         const userInfo = uni.getStorageSync('app_user_info') || uni.getStorageSync('app_user_info');
-        if (!userInfo) return;
+        if (!userInfo) {
+          // Sprint 5.2：未登录 → 显示「请先登录」而不是「相册是空的」
+          this.isLoggedIn = false;
+          this.photosList = [];
+          console.warn('[my-photos] 未登录，跳过加载');
+          return;
+        }
+        this.isLoggedIn = true;
 
         uni.showLoading({ title: '加载中' });
-        const res = await businessApi.getUserPhotos({ openid: userInfo._id });
-        
-        if (res && res.code === 200) {
+        // Sprint 5.2：用 userId 而不是 openid ——
+        // 后端 resolveUserId 读的是 userId；openid 只是历史命名。
+        const res = await businessApi.getUserPhotos({
+          openid: userInfo._id || userInfo.id,
+          userId: userInfo._id || userInfo.id
+        });
+
+        console.log('[my-photos] 加载结果:', {
+          code: res && res.code,
+          count: res && res.data ? res.data.length : 0
+        });
+
+        if (res && res.code === 200 && Array.isArray(res.data)) {
             this.photosList = res.data.map(p => ({
                 ...p,
                 date: this.formatTimestamp(p.createTime)
             }));
+        } else {
+          this.loadError = (res && (res.errMsg || res.message)) || '接口返回异常';
         }
       } catch (e) {
         console.error('加载相册失败:', e)
+        this.loadError = (e && e.message) ? e.message : '网络异常'
         uni.showToast({ title: '加载失败', icon: 'none' })
       } finally {
+        this.loading = false;
         uni.hideLoading();
       }
+    },
+
+    /** Sprint 5.2：去登录 */
+    goLogin() {
+      uni.navigateTo({ url: '/pages/login/login' });
     },
     
     formatTimestamp(ts) {
@@ -314,11 +370,23 @@ export default {
   align-items: center;
   justify-content: center;
   padding: 80rpx 40rpx;
-  background: transparent; 
+  background: transparent;
   box-shadow: none;
   margin: auto;
   width: 100%;
   box-sizing: border-box;
+}
+
+/* Sprint 5.2：空状态里的行动按钮 */
+.empty-btn {
+  margin-top: 32rpx;
+  background-color: #DC825E;
+  color: #FFFFFF;
+  font-size: 26rpx;
+  padding: 0 40rpx;
+  height: 68rpx;
+  line-height: 68rpx;
+  border-radius: 34rpx;
 }
 
 .empty-icon {

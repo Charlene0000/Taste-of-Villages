@@ -189,17 +189,22 @@ global.describe('normalizeUserPhotos', () => {
 			{ id: 1, url: '/uploads/a.png', images: '["/uploads/a.png","/uploads/b.png"]' }
 		])
 		assert.strictEqual(out[0]._id, 1)
-		assert.deepStrictEqual(out[0].images, ['/uploads/a.png', '/uploads/b.png'])
+		// Sprint 5.2：URL 会被转成绝对地址
+		// （相对路径在 H5/Web 端给 <image src> 会裂图）
+		assert.deepStrictEqual(out[0].images, [
+			'http://localhost:3000/uploads/a.png',
+			'http://localhost:3000/uploads/b.png'
+		])
 	})
 
 	test('images 缺失时用 url 兜底', () => {
 		const out = N.normalizeUserPhotos([{ id: 1, url: '/uploads/a.png' }])
-		assert.deepStrictEqual(out[0].images, ['/uploads/a.png'])
+		assert.deepStrictEqual(out[0].images, ['http://localhost:3000/uploads/a.png'])
 	})
 
 	test('images 是非法 JSON 时也用 url 兜底', () => {
 		const out = N.normalizeUserPhotos([{ id: 1, url: '/uploads/a.png', images: 'xxx' }])
-		assert.deepStrictEqual(out[0].images, ['/uploads/a.png'])
+		assert.deepStrictEqual(out[0].images, ['http://localhost:3000/uploads/a.png'])
 	})
 })
 

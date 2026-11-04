@@ -231,25 +231,29 @@
 		{
 			"path": "pages/agent-demo/agent-demo",
 			"style": {
-				"navigationBarTitleText": "Agent 演示"
+				"navigationBarTitleText": "Agent 演示",
+				"navigationStyle": "custom"
 			}
 		},
 		{
 			"path": "pages/avatar-demo/avatar-demo",
 			"style": {
-				"navigationBarTitleText": "数字人演示"
+				"navigationBarTitleText": "数字人演示",
+				"navigationStyle": "custom"
 			}
 		},
 		{
 			"path": "pages/login/login",
 			"style": {
-				"navigationBarTitleText": "登录"
+				"navigationBarTitleText": "登录",
+				"navigationStyle": "custom"
 			}
 		},
 		{
 			"path": "pages/userinfo/userinfo",
 			"style": {
-				"navigationBarTitleText": "个人资料"
+				"navigationBarTitleText": "个人资料",
+				"navigationStyle": "custom"
 			}
 		}
 	],

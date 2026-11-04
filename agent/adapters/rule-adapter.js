@@ -18,6 +18,9 @@ const INTENTS = [
 	{
 		intent: 'user-stats',
 		keywords: [
+			// Sprint 5.2：补「我是谁」这类身份问法
+			// 原关键词全是「登录/几次/注册/天数」，
+			// 问「我是谁」「我的账号是什么」一个都命中不了 → 必然降级。
 			{ word: '登录', weight: 3 },
 			{ word: '登陆', weight: 3 },
 			{ word: '登入', weight: 3 },
@@ -26,21 +29,43 @@ const INTENTS = [
 			{ word: '注册', weight: 2 },
 			{ word: '天数', weight: 2 },
 			{ word: '多少天', weight: 2 },
-			{ word: '账号', weight: 1 },
-			{ word: '账户', weight: 1 },
-			{ word: '统计', weight: 1 }
+			{ word: '账号', weight: 2 },
+			{ word: '账户', weight: 2 },
+			{ word: '统计', weight: 1 },
+			// —— Sprint 5.2 新增：身份类 ——
+			{ word: '我是谁', weight: 4 },
+			{ word: '我是', weight: 2 },
+			{ word: '我的号', weight: 3 },
+			{ word: '我的账户', weight: 3 },
+			{ word: '我的账号', weight: 3 },
+			{ word: '我的手机', weight: 3 },
+			{ word: '我的手机号', weight: 4 },
+			{ word: '我的昵称', weight: 4 },
+			{ word: '我的资料', weight: 3 },
+			{ word: '个人信息', weight: 3 },
+			{ word: '什么手机号', weight: 3 }
 		]
 	},
 	{
 		intent: 'server-time',
 		keywords: [
-			{ word: '几点', weight: 3 },
+			{ word: '几点', weight: 4 },
 			{ word: '时间', weight: 3 },
 			{ word: '现在', weight: 2 },
 			{ word: '当前', weight: 2 },
 			{ word: '服务器', weight: 2 },
 			{ word: '时刻', weight: 2 },
-			{ word: '日期', weight: 1 }
+			{ word: '日期', weight: 1 },
+			// —— Sprint 5.2 新增：口语化时间问法 ——
+			{ word: '几点了', weight: 4 },
+			{ word: '现在几点', weight: 4 },
+			{ word: '什么时候', weight: 3 },
+			{ word: '今天几号', weight: 4 },
+			{ word: '今天日期', weight: 4 },
+			// 「今天」单独出现时不作为意图信号 ——
+			// 「今天天气怎么样」应该走降级，而不是命中 server-time。
+			// 权重 0 表示「命中但不加分」，既保留匹配可见性，又不影响打分。
+			{ word: '今天', weight: 0 }
 		]
 	},
 	{
@@ -71,6 +96,13 @@ function classify (input) {
 
 		for (const kw of intent.keywords) {
 			if (text.indexOf(kw.word.toLowerCase()) !== -1) {
+				// Sprint 5.2：权重 0 的关键词是「提示词」——
+				// 命中时不加分，也**不计入 matched**。
+				// 否则「今天天气怎么样」会因为命中「今天」而
+				// 产生一个 score=0 的匹配，把 reason 从
+				// 'no-intent-matched' 变成 'low-confidence'，
+				// 改变了降级的语义（虽然最终都走降级，但测试与日志会失真）。
+				if (kw.weight === 0) continue
 				score += kw.weight
 				matched.push(kw.word)
 			}

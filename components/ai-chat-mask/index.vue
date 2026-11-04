@@ -302,56 +302,79 @@ export default {
           // 现在按后端契约传参：顶层 message + 可选 messages。
           console.log('[ai-chat-mask] 发送提问:', userQuestion);
 
-          const res = await agentApi.chat({
+          const payload = {
               message: userQuestion,
               messages: [
                   { role: 'user', content: userQuestion }
               ],
               system: systemPrompt
-          });
+          };
 
-          console.log('[ai-chat-mask] Agent 响应:', {
+          // Sprint 5.2：打印实际发给后端的 Payload
+          // 出问题时第一眼就能看出「后端到底收到了什么」，
+          // 不用再去翻 Network 面板猜。
+          console.log('[ai-chat-mask] 请求 Payload:', JSON.stringify(payload, null, 2));
+
+          const res = await agentApi.chat(payload);
+
+          console.log('[ai-chat-mask] Agent 原始响应:', JSON.stringify(res, null, 2));
+          console.log('[ai-chat-mask] Agent 响应摘要:', {
               code: res && res.code,
               source: res && res.source,
               degraded: res && res.degraded,
-              hasAnswer: !!(res && res.answer)
+              hasAnswer: !!(res && res.answer),
+              hasResult: !!(res && res.result)
           });
 
           this.isSending = false;
 
-          // 后端同时提供两种取值路径：
-          //   ① res.answer                       —— 新契约（推荐）
-          //   ② res.result.choices[0].message.content —— OpenAI 兼容结构
+          // Sprint 5.2：兼容三种响应形态
+          //   ① res.answer                        —— 当前后端的扁平结构
+          //   ② res.data.answer                    —— 若后端改为 {code, data:{...}}
+          //   ③ res.result.choices[0].message.content —— OpenAI 兼容结构
+          //   ④ res.data.result.choices[0]...     —— ②的兼容形态
+          // 之前只判 ①③，后端一旦包一层 data 就取不到答案 → 界面显示兜底话术。
           let reply = ''
-          if (res && typeof res.answer === 'string' && res.answer.trim()) {
-              reply = res.answer
-          } else if (res && res.result && res.result.choices && res.result.choices[0]) {
-              reply = res.result.choices[0].message.content || ''
-          } else if (res && res.choices && res.choices[0]) {
-              reply = res.choices[0].message.content || ''
+          const pick = (obj) => {
+              if (!obj) return ''
+              if (typeof obj.answer === 'string' && obj.answer.trim()) return obj.answer
+              if (obj.result) {
+                  const r = obj.result
+                  if (typeof r === 'string' && r.trim()) return r
+                  if (r.choices && r.choices[0] && r.choices[0].message) {
+                      return r.choices[0].message.content || ''
+                  }
+                  if (typeof r.answer === 'string' && r.answer.trim()) return r.answer
+              }
+              if (obj.choices && obj.choices[0] && obj.choices[0].message) {
+                  return obj.choices[0].message.content || ''
+              }
+              return ''
           }
 
-          if (res && res.code === 200 && reply) {
-             reply = reply.replace(/\*/g, '').trim();
+          reply = pick(res) || pick(res && res.data) || ''
 
+          if (reply) {
+             reply = reply.replace(/\*/g, '').trim();
              this.messages[this.messages.length - 1].content = '';
              this.currentReply = reply;
              this.startTypingCustom(reply);
           } else {
              this.isTyping = false;
-             const fallback = (res && res.capabilities && res.capabilities.length)
-                 ? res.capabilities.map(c => c.name || c).join('、')
+             const caps = (res && res.capabilities) || (res && res.data && res.data.capabilities)
+             const fallbackText = (caps && caps.length)
+                 ? caps.map(c => c.name || c).join('、')
                  : '';
-             this.messages[this.messages.length - 1].content = fallback
-                 ? `我目前只能回答这些问题：${fallback}`
+             this.messages[this.messages.length - 1].content = fallbackText
+                 ? `我目前只能回答这些问题：${fallbackText}`
                  : '这个问题我还答不上来，换个关于美食的话题聊聊吧～';
-             console.error('[ai-chat-mask] Service Error:', res);
+             console.error('[ai-chat-mask] 未取到答案，完整响应:', res);
           }
       } catch (e) {
           this.isSending = false;
           this.isTyping = false;
           this.messages[this.messages.length - 1].content = '网络错误：' + (e && e.message ? e.message : '未知错误');
-          console.error('[ai-chat-mask] Call API Error:', e);
+          console.error('[ai-chat-mask] 调用失败:', e);
       }
     },
     startTypingCustom(answer) {

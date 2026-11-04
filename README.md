@@ -234,6 +234,13 @@ curl http://localhost:3000/api/health
 > 脚本是幂等的（先清空业务表再写入），可重复执行。
 > 只想校验种子文件格式而不写库：`node scripts/seed.js --check`。
 
+> **H5 端地图说明**：uni-app 的 `<map>` 在浏览器端需要**腾讯位置服务 Key**，
+> 没有 Key 时组件渲染为空白。本项目零配置可跑（不依赖任何云账号），
+> 所以 H5 端会**自动降级**为「村庄列表」占位视图 —— 每个村庄仍可点击进入打卡，
+> 功能不缺，只是没有地图底图。
+> 需要地图底图时，在 `manifest.json` → `h5` → `sdkConfigs` → `maps` 里
+> 填入你的腾讯地图 Key 即可自动切换回真地图。
+
 > `dev.db` 已被 `.gitignore` 排除，不会进入版本库。
 > 想从零重建，删掉 `server/prisma/dev.db` 后重新 `npx prisma db push && npm run seed` 即可。
 
@@ -515,7 +522,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 | 1 | **APK 未实际打包** | ⬜ 未执行 | 无 DCloud 账号与打包凭据，且本地无 HBuilderX CLI。`build-apk.yml` 结构正确、YAML 校验通过，但**未在真实环境跑通**，不产出 APK |
 | 2 | **真机安装未验证** | ⬜ 未执行 | 无 Android 真机环境。「Android 10+ 安装不闪退」是待验证项，不是已验证结论 |
 | 3 | **真实短信未发送** | ⬜ 未执行 | 短信服务商未接入。`send-code` 的完整逻辑经 39 项后端测试验证（含频控、锁定），但**真实短信链路未跑通** |
-| 4 | **前端未在 HBuilderX 中实际运行** | ⬜ 未执行 | Sprint 5.1 已修复批量替换引入的 12 类运行时断裂（详见 Technical Highlights 亮点 5/6），并新增 39 项前端测试 + 静态扫描器兜底；但**仍未在 HBuilderX 模拟器/真机中点过一遍**。真机调试还需把 `BASE_URL` 改为局域网 IP |
+| 4 | **前端未在 HBuilderX 中实际运行** | ⬜ 未执行 | Sprint 5.1 修复 12 类运行时断裂、Sprint 5.2 修复 12 类原生能力与 UI 缺陷，累计新增 46 项前端测试 + 2 个静态扫描器兜底；但**仍未在 HBuilderX 模拟器/真机中点过一遍**。真机调试还需把 `BASE_URL` 改为局域网 IP |
 | 5 | **git 未 push** | ⬜ 未执行 | 仓库无 remote，按约定不自行添加 |
 | 6 | **Canvas 渲染未在真机/模拟器验证** | ⬜ 未执行 | 渲染逻辑有单元测试覆盖（参数裁剪、表情切换、无 ctx 不抛异常），但实际画面效果需在 HBuilderX 中运行确认 |
 
@@ -537,16 +544,20 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 | 18 | **Android 存储权限用 READ/WRITE_EXTERNAL_STORAGE** | Android 13+ 已废弃该模式，需迁移到 `READ_MEDIA_IMAGES` | 打包上架前处理 |
 | 19 | **题目 slug 映射维护在前端** | `QUIZ_SLUG_MAP` 靠题目文本反查所属村庄。Prisma 的 `QuizQuestion` 没有 slug 字段（本轮约定不改后端）。新增题目时需同步维护这张表，否则新题会被归到 default 组 | 见 Future Work（给 schema 加 slug 字段） |
 | 20 | **答题进度不含 quiz 维度** | 原云函数查 `userQuizLogs` 表算答题进度，新后端没有这张表。进度分母仍按 4 计算，因此实际进度会偏低 0/25/50/75 | 见 Future Work（新增 quiz_logs 表） |
+| 21 | **H5 端无地图底图** | `<map>` 在浏览器端需要腾讯位置服务 Key，零配置下自动降级为村庄列表占位视图。功能不缺，只是没有地图 | 在 `manifest.json` 填入腾讯地图 Key 即可恢复 |
+| 22 | **品鉴评分是本地模拟** | `analyzeFoodPhoto` 返回确定性哈希生成的 80-95 分与随机点评，不是真实图像识别 | 见 Future Work（接入百度 AI 凭据） |
+| 23 | **H5 端定位不可用** | 浏览器定位要求 HTTPS + 用户授权，非 HTTPS 的本地调试无法定位。页面提供「模拟打卡」按钮跳过定位（走相同后端接口） | 真机调试或部署 HTTPS |
+| 24 | **打卡景点名存在 address 字段** | 后端 `CheckInPlace` 模型没有 `checkType` 字段，景点名借 `address` 承载以支持状态回显 | 见 Future Work（给 schema 加 checkType 字段） |
 
 ### 🟢 环境相关的注意事项
 
 | # | 项目 | 说明 |
 |---|---|---|
-| 21 | `server/.env` 的 `JWT_SECRET` 现为占位符 | **部署前必须替换**，否则 JWT 可被伪造。生成方法见 Production Deployment |
-| 22 | `server/.env` 的 `DEV_MODE` 现为 true | **生产必须改为 false**，否则验证码直接出现在接口响应里 |
-| 23 | 真机调试需改 `BASE_URL` | `http://localhost:3000` 在手机上指向手机自身，需改为电脑局域网 IP |
-| 24 | 旧 uniCloud 资源仍在云端 | 若之前关联过阿里云空间，那些云函数仍存在，但**本项目已不再使用**，可自行在控制台清理 |
-| 25 | **必须执行 `npm run seed`** | Sprint 5 用 Prisma 重建数据库时未迁移原 uniCloud 的种子数据。跳过这一步，商城/题库/美食/村庄列表全为空 | Getting Started 第二步已补上该命令 |
+| 25 | `server/.env` 的 `JWT_SECRET` 现为占位符 | **部署前必须替换**，否则 JWT 可被伪造。生成方法见 Production Deployment |
+| 26 | `server/.env` 的 `DEV_MODE` 现为 true | **生产必须改为 false**，否则验证码直接出现在接口响应里 |
+| 27 | 真机调试需改 `BASE_URL` | `http://localhost:3000` 在手机上指向手机自身，需改为电脑局域网 IP |
+| 28 | 旧 uniCloud 资源仍在云端 | 若之前关联过阿里云空间，那些云函数仍存在，但**本项目已不再使用**，可自行在控制台清理 |
+| 29 | **必须执行 `npm run seed`** | Sprint 5 用 Prisma 重建数据库时未迁移原 uniCloud 的种子数据。跳过这一步，商城/题库/美食/村庄列表全为空 | Getting Started 第二步已补上该命令 |
 
 ---
 ## Features
@@ -570,6 +581,24 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 | `res.data.newPoints` 不存在 | 兑换后积分变 undefined | 优先服务端余额，否则本地扣减 |
 | 守卫在 `onLoad` 判断路由 | 未登录可绕过守卫 | 显式传路由，消除页面栈时序依赖 |
 | 种子数据未迁移 | 全新 clone 后所有列表为空 | `server/scripts/seed.js` + `server/data/seed.json` |
+
+
+### 🔧 Sprint 5.2 修复补丁（原生能力降级 + UI 细节还原）
+
+| 断裂 | 症状 | 修复 |
+|---|---|---|
+| 首页地图空白 | H5 端 `<map>` 无腾讯地图 Key → 渲染为空白 | `utils/map-capability.js` 检测平台与 Key，不可用时降级为「村庄列表」占位视图，每个村庄仍可点击进入打卡 |
+| 定位打卡没反应 | `uni.getLocation` 失败只 `console.error`，界面无任何反馈 | 捕获错误 → 状态卡片显示针对性提示（权限/HTTPS/超时/不支持）+ toast 提示 + 「重试」按钮 |
+| 无法在 Web 端联调打卡 | H5 端定位受限，无法完成打卡链路 | 新增「模拟打卡」按钮：跳过定位，走**完全相同**的后端接口与参数 |
+| 打卡参数错位 | 前端不传 `type`，后端默认 `photo` → 定位打卡被误判为拍照打卡，进度统计错 | 补齐后端真正读取的 `type` 与 `address` 字段 |
+| Agent 只回兜底话术 | `/api/agent/chat` 只做知识库检索，「我是谁」「几点了」全走降级 | 知识库未命中时**接入 Agent 编排层**（planner + executor），可查用户信息与服务器时间 |
+| `user-stats` 工具读到 undefined | 工具读 uniCloud 字段名 `login_count`，而 Prisma 是 `loginCount` | 工具兼容两套字段名 |
+| 规则引擎识别不了「我是谁」 | 关键词全是「登录/几次/注册」 | 补身份类与口语化时间关键词；权重 0 的提示词不计入匹配 |
+| 拍照后无评分与点评 | `analyzeFoodPhoto` 返回的字段与前端期望（`isFood`/`score`/`comment`/`tags`）完全对不上 | 新增 `server/src/services/food-review.js` 本地品鉴引擎：确定性哈希 → 80-95 分 + 美食点评 + 标签，零外部依赖 |
+| **上传接口 404** | `router.post('/:name')` 注册在 `/upload` 之前 → `/upload` 被 `:name` 抢先匹配 | 上传路由前移（Express 按注册顺序匹配），并加回归测试 |
+| 相册图片裂图 | 后端返回相对路径 `/uploads/x.png`，H5 端当站点根路径请求 → 404 | 新增 `utils/url.js`，归一化层统一拼成绝对 URL |
+| 相册空白无提示 | 未登录/加载失败都显示「相册还是空的」 | 区分「加载中 / 未登录 / 加载失败 / 空相册」四种状态 |
+| 页面成死胡同 | 删 uni-id-pages 后原生导航栏在 Web 端不渲染返回键 | 新增自研 `components/nav-bar`，覆盖 4 个手写页面 |
 
 ### 📱 业务功能（既有资产，已增强）
 
@@ -987,6 +1016,7 @@ trace 是调试用的短期数据，落库会带来额外的隐私与清理成�
 | **Sprint 4** | 打包配置与上线文档 | Android 权限收敛；`build-apk.yml` CI；README 补全；五阶段上线手册 | `256aa09` |
 | **Sprint 5** | **脱离 uniCloud + 搭建真实 HTTP 后端** | **`server/` 独立后端工程（Express + Prisma + SQLite）；44 处 uniCloud 调用全部替换；手写登录页与用户中心；自研路由守卫；Agent 编排迁至服务端** | `256aa09` → 本次提交 |
 | **Sprint 5.1** | **重构车祸修复补丁** | **12 类运行时断裂修复；`utils/normalizer.js` 协议适配层；39 项前端测试；`scripts/check-frontend-refs.js` 静态扫描器；种子数据迁移** | 本次提交 |
+| **Sprint 5.2** | **原生能力降级 + UI 细节还原** | **地图占位视图；定位失败兜底 + 模拟打卡；Agent 接入编排层；本地品鉴引擎；上传路由顺序修复；URL 绝对化；自研 nav-bar** | 本次提交 |
 
 ### Sprint 5 的架构重构决策
 
@@ -1015,6 +1045,7 @@ trace 是调试用的短期数据，落库会带来额外的隐私与清理成�
 | S4 | JSON 91 个全绿 · workflow YAML 校验通过 · README 全部章节有实质内容 | ✅ |
 | S5 | 后端 39/39 · 全仓库 uniCloud 零残留 · 44 处调用替换 · 数据实测落库 · Agent 四场景实测 | ✅ |
 | S5.1 | 前端归一化 23/23 · 端到端契约 16/16 · 残留引用扫描零命中 · 26 个 .vue 语法全绿 · 打卡进度 0→25 实测 | ✅ |
+| S5.2 | 后端 50/50 · 前端 107/107 · 27 个 .vue 语法全绿 · 上传 404→200 实测 · 品鉴评分区间 80-95 实测 · Agent 编排接入实测 | ✅ |
 
 ### 全程守住的边界
 

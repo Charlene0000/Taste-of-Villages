@@ -111,6 +111,28 @@
         </view>
         
         
+        <view style="height: 10        </view>
+
+        <!--
+          Sprint 5.2：定位状态提示
+          H5 端 uni.getLocation 依赖 HTTPS 与浏览器地理位置权限，
+          失败时若无任何提示，用户点击打卡就是「没反应」。
+          这里把定位状态显式呈现出来，并提供「模拟打卡」入口便于 Web 端联调。
+        -->
+        <view class="location-status" v-if="!locationOk">
+            <view class="status-row">
+                <text class="status-icon">📍</text>
+                <view class="status-text-wrap">
+                    <text class="status-title">{{ locationStatusTitle }}</text>
+                    <text class="status-desc">{{ locationStatusDesc }}</text>
+                </view>
+                <button class="status-retry" size="mini" @click="getLocation">重试</button>
+            </view>
+            <button class="mock-btn" size="mini" @click="mockCheckIn">
+                模拟打卡（跳过定位，仅用于 Web 端联调）
+            </button>
+        </view>
+
         <view style="height: 100px;"></view>
     </scroll-view>
   </view>
@@ -126,24 +148,66 @@ export default {
     return {
       loading: true,
       villageData: {},
-      attractions: [], 
-      
-      
+      attractions: [],
+
+
       openid: '',
       latitude: null,
       longitude: null,
       address: '',
-      
-      
+
+      // Sprint 5.2：定位状态
+      // locationOk      —— 是否已成功获取定位
+      // locationError   —— 定位失败的原因（用于给出针对性提示）
+      locationOk: false,
+      locationError: '',
+      locationLoading: false,
+
       targetLocation: {
         latitude: 0,
         longitude: 0
       },
-      
-      
+
+
       slug: '',
       id: '',
-      locationId: '' 
+      locationId: ''
+    }
+  },
+
+  computed: {
+    /** 定位是否已就绪 */
+    locationOk () {
+      return !!(this.latitude && this.longitude)
+    },
+
+    /** 定位状态标题 */
+    locationStatusTitle () {
+      if (this.locationLoading) return '正在获取定位...'
+      if (this.locationError) return '定位不可用'
+      return '等待定位'
+    },
+
+    /** 定位状态说明（针对不同失败原因给出不同指引） */
+    locationStatusDesc () {
+      if (this.locationLoading) return '请稍候'
+      if (!this.locationError) return '点击「重试」获取当前位置'
+
+      const err = this.locationError
+      // uni.getLocation 在 H5 端的典型失败原因
+      if (/auth|permission|denied|deny/i.test(err)) {
+        return '浏览器拒绝了定位权限，请在地址栏左侧的权限设置中允许定位'
+      }
+      if (/https|secure/i.test(err)) {
+        return 'H5 端定位要求 HTTPS 环境，本地 http 调试请改用真机或配置 HTTPS'
+      }
+      if (/timeout/i.test(err)) {
+        return '定位超时，请在开阔地方重试，或检查系统定位服务是否开启'
+      }
+      if (/not support|unsupported/i.test(err)) {
+        return '当前平台不支持定位，请使用真机或小程序端'
+      }
+      return '请在真机环境或 HTTPS 下使用定位'
     }
   },
   onLoad(options) {
@@ -258,14 +322,22 @@ export default {
                     locationId: this.locationId
                 });
             if (res && res.code === 200) {
-                const logs = res.data;
+                const logs = res.data || [];
                 
                 this.attractions.forEach(item => {
                     const spotType = `spot_${item.name}`;
                     
                     
                     
-                    const isChecked = logs.some(log => log.type === spotType);
+                    // Sprint 5.2：后端 checkIn 的 type 是固定值 'location'
+                    // （location/photo/make 三选一，用于进度统计），
+                    // 具体是哪个景点靠 checkType 区分。
+                    // 所以判断「该景点是否已打卡」需同时看两个字段。
+                    const isChecked = logs.some(log =>
+                        log.type === spotType ||
+                        log.checkType === spotType ||
+                        (item.name && log.address === item.name)
+                    );
                     if (isChecked) {
                         item.checked = true;
                     }
@@ -303,7 +375,19 @@ export default {
         }
     },
 
+    /**
+     * 获取当前位置
+     *
+     * Sprint 5.2 修复：
+     * 原实现的 catch 只 console.error，用户点击打卡「没反应」。
+     * 现在：
+     *   ① 记录失败原因到 locationError（用于界面提示）
+     *   ② 失败时弹出明确 toast
+     *   ③ 成功时清空错误状态
+     */
     async getLocation() {
+      this.locationLoading = true;
+      console.log('[location] 开始获取定位...');
       try {
         const res = await new Promise((resolve, reject) => {
             uni.getLocation({
@@ -314,8 +398,86 @@ export default {
         });
         this.latitude = res.latitude;
         this.longitude = res.longitude;
+        this.locationOk = true;
+        this.locationError = '';
+        console.log('[location] 定位成功:', res);
       } catch (e) {
-        console.error('Location error:', e);
+        this.locationOk = false;
+        this.locationError = (e && (e.errMsg || e.message)) || '定位失败';
+        console.error('[location] 定位失败:', this.locationError);
+
+        // Sprint 5.2：给出明确反馈，而不是静默失败
+        uni.showToast({
+          title: '定位失败，请查看页面提示',
+          icon: 'none',
+          duration: 2500
+        });
+      } finally {
+        this.locationLoading = false;
+      }
+    },
+
+    /**
+     * 模拟打卡（跳过真实定位）
+     *
+     * Sprint 5.2 新增：
+     * H5 端定位受 HTTPS 与浏览器权限限制，无法在浏览器里完成真实定位打卡。
+     * 这个按钮让开发者能在 Web 端直接联调「打卡 → 落库 → 进度更新」链路，
+     * 不必每次都拿真机测试。
+     *
+     * 走的是与真实打卡**完全相同**的后端接口与参数，
+     * 因此它验证的是真实链路，只是跳过了定位这一步。
+     */
+    async mockCheckIn() {
+      if (!this.openid) {
+        uni.showToast({ title: '请先登录', icon: 'none' });
+        uni.navigateTo({ url: '/pages/login/login' });
+        return;
+      }
+
+      if (!this.locationId) {
+        uni.showToast({ title: '参数缺失', icon: 'none' });
+        return;
+      }
+
+      uni.showLoading({ title: '模拟打卡中', mask: true });
+
+      try {
+        const res = await businessApi.checkIn({
+          openid: this.openid,
+          // 后端 checkIn 读取的字段：
+          locationId: this.locationId,
+          address: this.villageData.name || this.villageData.location || '模拟位置',
+          type: 'location',
+          // 以下为业务侧的附加信息（后端暂未使用，保留语义）
+          checkType: 'location',
+          locationName: this.villageData.name,
+          mock: true
+        });
+
+        uni.hideLoading();
+
+        console.log('[location] 模拟打卡响应:', res);
+
+        if (res && res.code === 200) {
+          // 标记所有景点为已打卡（模拟态）
+          this.attractions.forEach(a => { a.checked = true; });
+          uni.showToast({ title: '模拟打卡成功', icon: 'success' });
+          // 刷新记录，让进度同步更新
+          this.fetchUserStatus && this.fetchUserStatus();
+        } else {
+          uni.showToast({
+            title: (res && (res.errMsg || res.message)) || '模拟打卡失败',
+            icon: 'none'
+          });
+        }
+      } catch (e) {
+        uni.hideLoading();
+        console.error('[location] 模拟打卡失败:', e);
+        uni.showToast({
+          title: (e && e.message) ? e.message : '模拟打卡失败',
+          icon: 'none'
+        });
       }
     },
 
@@ -343,38 +505,66 @@ export default {
         }
 
         uni.showLoading({ title: '打卡中', mask: true });
-        
+
         try {
             const uniqueType = `spot_${item.name}`;
 
+            // Sprint 5.2 修复：后端参数对齐
+            //
+            // 后端 checkIn 实际读取的字段只有三个：
+            //   const { locationId, address, type = 'photo' } = req.body
+            //
+            // 原前端传的是：
+            //   { openid, checkType, locationName, spotName, locationId,
+            //     location:{lat,lng}, targetLocation, timestamp }
+            //
+            // → address 缺失 → 打卡记录没有地址
+            //   → type 缺失 → 后端默认成 'photo'，
+            //     而定位打卡应为 'location'，
+            //     导致进度统计把定位打卡误判为拍照打卡
+            //
+            // 现在把后端真正需要的字段补齐，附加字段继续保留。
             const res = await businessApi.checkIn({
                     openid: this.openid,
-                    checkType: uniqueType, 
+                    // —— 后端必读 ——
+                    locationId: this.locationId,
+                    // address 带上景点名：后端 CheckInPlace 模型没有 checkType 字段，
+                    // 而 checkType 存的是 'spot_xxx'，
+                    // 所以把景点名写进 address，状态回显时按 address 匹配。
+                    address: (item && item.name ? item.name : (this.villageData.name || '')),
+                    type: 'location',
+                    // —— 业务附加信息 ——
+                    checkType: uniqueType,
                     locationName: this.villageData.name,
                     spotName: item.name,
-                    locationId: this.locationId, 
                     location: {
                         latitude: this.latitude,
                         longitude: this.longitude
                     },
-                    targetLocation: this.targetLocation, 
+                    targetLocation: this.targetLocation,
                     timestamp: Date.now()
                 });
 
             uni.hideLoading();
-            
+
+            console.log('[location] 打卡响应:', res);
+
             if (res && (res.code === 200 || res.code === 0)) {
                 item.checked = true;
                 uni.showToast({ title: '打卡成功 +35积分', icon: 'success' });
             } else {
-                 uni.showToast({ 
-                     title: res.message || '打卡失败', 
-                     icon: 'none' 
+                 uni.showToast({
+                     title: (res && (res.errMsg || res.message)) || '打卡失败',
+                     icon: 'none'
                  });
             }
         } catch (e) {
             uni.hideLoading();
-            uni.showToast({ title: '服务器错误', icon: 'none' });
+            console.error('[location] 打卡失败:', e);
+            uni.showToast({
+                title: (e && e.message) ? e.message : '服务器错误',
+                icon: 'none'
+            });
         }
     }
   }
@@ -444,6 +634,68 @@ export default {
 }
 .right-placeholder { width: 32px; }
 
+
+/* Sprint 5.2：定位状态提示卡 */
+.location-status {
+	background-color: #FFF8E1;
+	border: 1rpx dashed #FFE082;
+	border-radius: 20rpx;
+	padding: 24rpx 24rpx 20rpx;
+	margin: 24rpx 32rpx 8rpx;
+}
+
+.status-row {
+	display: flex;
+	align-items: flex-start;
+}
+
+.status-icon {
+	font-size: 40rpx;
+	margin-right: 16rpx;
+	flex-shrink: 0;
+}
+
+.status-text-wrap {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+}
+
+.status-title {
+	font-size: 28rpx;
+	font-weight: 600;
+	color: #B08968;
+	margin-bottom: 8rpx;
+}
+
+.status-desc {
+	font-size: 23rpx;
+	color: #A1887F;
+	line-height: 1.6;
+}
+
+.status-retry {
+	margin-left: 16rpx;
+	flex-shrink: 0;
+	background-color: #FFE082;
+	color: #7A5C2E;
+	font-size: 22rpx;
+	padding: 0 22rpx;
+	height: 56rpx;
+	line-height: 56rpx;
+	border-radius: 28rpx;
+}
+
+.mock-btn {
+	margin-top: 18rpx;
+	background-color: #FFFFFF;
+	color: #D87A46;
+	border: 1rpx solid #FFCCBC;
+	font-size: 23rpx;
+	height: 64rpx;
+	line-height: 64rpx;
+	border-radius: 32rpx;
+}
 
 .content-scroll {
     width: 100%;

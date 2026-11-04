@@ -1,5 +1,13 @@
 <template>
 	<view class="page">
+		<!--
+			Sprint 5.2：显式返回按钮
+			删掉 uni-id-pages 后本页改用原生导航栏，
+			H5/Web 端常不渲染返回按钮 → 死胡同。
+			用自研 nav-bar 补一个始终可见的返回入口。
+		-->
+		<nav-bar title="登录" />
+
 		<view class="header">
 			<text class="title">欢迎回来</text>
 			<text class="subtitle">登录后即可打卡、签到、兑换特产</text>
@@ -85,8 +93,10 @@
 
 <script>
 import { authApi } from '@/utils/auth.js'
+import NavBar from '@/components/nav-bar/nav-bar.vue'
 
 export default {
+	components: { NavBar },
 	data () {
 		return {
 			mobile: '',

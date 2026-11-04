@@ -19,6 +19,7 @@
 const http = require('http')
 const fs = require('fs')
 const path = require('path')
+const os = require('os')
 
 const BASE = 'http://localhost:3000'
 
@@ -303,6 +304,160 @@ async function run () {
 		const r = await req('GET', '/api/health')
 		assert.strictEqual(r.status, 200)
 		assert.strictEqual(r.body.code, 200)
+	})
+
+	// ---------- ⑨ Sprint 5.2 · 本地品鉴引擎 ----------
+	console.log('\n【⑨ 本地品鉴引擎（analyzeFoodPhoto）】')
+
+	await check('返回前端期望的字段 isFood/score/comment/tags', async () => {
+		const r = await req('POST', '/api/business/analyzeFoodPhoto', {
+			fileID: '/uploads/test-1.jpg'
+		})
+		assert.strictEqual(r.status, 200)
+		assert.strictEqual(r.body.code, 200)
+		const d = r.body.data
+		assert.strictEqual(d.isFood, true, 'isFood 应为 true')
+		assert.strictEqual(typeof d.score, 'number', 'score 应为数字')
+		assert.strictEqual(typeof d.comment, 'string', 'comment 应为字符串')
+		assert.ok(Array.isArray(d.tags), 'tags 应为数组')
+		assert.ok(d.comment.length > 20, 'comment 应有实质内容')
+	})
+
+	await check('评分落在 80-95 区间', async () => {
+		for (let i = 0; i < 12; i++) {
+			const r = await req('POST', '/api/business/analyzeFoodPhoto', {
+				fileID: `/uploads/rand-${i}.jpg`
+			})
+			const s = r.body.data.score
+			assert.ok(s >= 80 && s <= 95, `评分 ${s} 越界（应 80-95）`)
+		}
+	})
+
+	await check('相同输入 → 完全相同的输出（确定性）', async () => {
+		const a = await req('POST', '/api/business/analyzeFoodPhoto', { fileID: '/uploads/same.jpg' })
+		const b = await req('POST', '/api/business/analyzeFoodPhoto', { fileID: '/uploads/same.jpg' })
+		assert.strictEqual(a.body.data.score, b.body.data.score)
+		assert.strictEqual(a.body.data.comment, b.body.data.comment)
+	})
+
+	await check('不同输入 → 不同输出（有变化感）', async () => {
+		const a = await req('POST', '/api/business/analyzeFoodPhoto', { fileID: '/uploads/x1.jpg' })
+		const b = await req('POST', '/api/business/analyzeFoodPhoto', { fileID: '/uploads/x2.jpg' })
+		assert.notStrictEqual(
+			a.body.data.score + a.body.data.comment,
+			b.body.data.score + b.body.data.comment,
+			'不同输入应产生不同结果'
+		)
+	})
+
+	await check('显式传入菜名时被采用', async () => {
+		const r = await req('POST', '/api/business/analyzeFoodPhoto', {
+			fileID: '/uploads/any.jpg',
+			name: '清蒸晨洲蚝'
+		})
+		assert.strictEqual(r.body.data.name, '清蒸晨洲蚝')
+	})
+
+	// ---------- ⑩ Sprint 5.2 · 上传路由顺序 ----------
+	console.log('\n【⑩ 文件上传（路由顺序回归）】')
+
+	await check('POST /api/business/upload 不被 :name 路由拦截', async () => {
+		const r = await req('POST', '/api/business/upload', {})
+		// 未带文件时 multer 会返回 400「未接收到文件」，
+		// 而不是 404「未知的业务接口: upload」——
+		// 后者说明 upload 路由被 :name 抢先匹配了。
+		assert.notStrictEqual(r.status, 404, 'upload 路由被 :name 拦截了')
+		assert.notStrictEqual(r.body.errCode, 'business-not-found',
+			'upload 路由被 :name 拦截了')
+	})
+
+	await check('上传的静态资源可被访问（相对路径 → 绝对 URL）', async () => {
+		// 构造一个最小 PNG
+		const png = Buffer.from(
+			'89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c489' +
+			'0000000a49444154789c6300010000050001od0a2db40000000049454e44ae426082',
+			'hex'
+		)
+		const tmp = path.join(os.tmpdir(), 'sprint52-upload-test.png')
+		fs.writeFileSync(tmp, png)
+
+		const boundary = '----sprint52boundary'
+		const body = Buffer.concat([
+			Buffer.from('--' + boundary + '\r\n'),
+			Buffer.from('Content-Disposition: form-data; name="file"; filename="t.png"\r\n'),
+			Buffer.from('Content-Type: image/png\r\n\r\n'),
+			png,
+			Buffer.from('\r\n--' + boundary + '--\r\n')
+		])
+
+		const res = await new Promise((resolve, reject) => {
+			const req2 = http.request({
+				hostname: 'localhost',
+				port: 3000,
+				path: '/api/business/upload',
+				method: 'POST',
+				headers: {
+					'Content-Type': 'multipart/form-data; boundary=' + boundary,
+					'Content-Length': body.length
+				}
+			}, r => {
+				let d = ''
+				r.on('data', c => { d += c })
+				r.on('end', () => resolve({ status: r.statusCode, body: JSON.parse(d) }))
+			})
+			req2.on('error', reject)
+			req2.write(body)
+			req2.end()
+		})
+
+		assert.strictEqual(res.status, 200, '上传应成功')
+		assert.ok(res.body.url, '应返回 url')
+		assert.ok(res.body.url.startsWith('/uploads/'), 'url 应是 /uploads/ 开头的相对路径')
+
+		// 相对路径拼上后端地址后应能取到文件
+		const abs = 'http://localhost:3000' + res.body.url
+		const getRes = await new Promise((resolve, reject) => {
+			http.get(abs, r => {
+				let n = 0
+				r.on('data', c => { n += c.length })
+				r.on('end', () => resolve({ status: r.statusCode, length: n }))
+			}).on('error', reject)
+		})
+		assert.strictEqual(getRes.status, 200, '静态资源应可访问')
+		assert.ok(getRes.length > 0, '文件不应为空')
+
+		try { fs.unlinkSync(tmp) } catch (e) { /* 忽略 */ }
+	})
+
+	// ---------- ⑪ Sprint 5.2 · Agent 编排接入 ----------
+	console.log('\n【⑪ Agent 编排接入（chat 未命中知识库时）】')
+
+	await check('「几点了」走编排层返回真实时间', async () => {
+		const r = await req('POST', '/api/agent/chat', { message: '几点了' })
+		assert.strictEqual(r.status, 200)
+		assert.strictEqual(r.body.source, 'agent-orchestration',
+			'应走编排层而不是 fallback：' + r.body.source)
+		assert.ok(/\d{4}/.test(r.body.answer), '应返回含年份的时间：' + r.body.answer)
+	})
+
+	await check('「我是谁」走编排层（未登录时给出明确说明）', async () => {
+		const r = await req('POST', '/api/agent/chat', { message: '我是谁' })
+		assert.strictEqual(r.status, 200)
+		assert.strictEqual(r.body.source, 'agent-orchestration',
+			'应走编排层：' + r.body.source)
+		assert.ok(r.body.answer && r.body.answer.length > 0, '应有回答')
+	})
+
+	await check('美食问题仍优先走知识库', async () => {
+		const r = await req('POST', '/api/agent/chat', { message: '晨洲村有什么好吃的' })
+		assert.strictEqual(r.body.source, 'knowledge-base')
+		assert.strictEqual(r.body.degraded, false)
+	})
+
+	await check('完全无关的问题仍走降级（不胡编）', async () => {
+		const r = await req('POST', '/api/agent/chat', { message: '今天天气怎么样' })
+		assert.strictEqual(r.body.source, 'fallback')
+		assert.strictEqual(r.body.degraded, true)
 	})
 
 	// ---------- 汇总 ----------

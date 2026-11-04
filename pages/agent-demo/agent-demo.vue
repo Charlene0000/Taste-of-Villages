@@ -1,5 +1,8 @@
 <template>
 	<view class="page">
+		<!-- Sprint 5.2：显式返回按钮（原生导航栏在 Web 端不渲染返回键） -->
+		<nav-bar title="Agent 演示" />
+
 		<view class="header">
 			<text class="title">Agent 演示</text>
 			<text class="subtitle">自研编排层 · 默认零外部依赖</text>
@@ -106,8 +109,10 @@
 import { runAgent, getTraces, clearTraces } from '@/agent/core/index'
 import registry from '@/agent/tools/index'
 import avatarSpeak from '@/agent/tools/avatar-speak'
+import NavBar from '@/components/nav-bar/nav-bar.vue'
 
 export default {
+	components: { NavBar },
 	data () {
 		return {
 			inputText: '',

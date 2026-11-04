@@ -1,7 +1,15 @@
 <template>
   <view class="container">
-    
+
+    <!--
+      Sprint 5.2：地图降级
+      uni-app 的 <map> 在 H5 端需要腾讯位置服务 Key，没有 Key 时渲染成一块空白。
+      本项目零配置可跑（不依赖任何云账号），所以 H5 无 Key 是预期状态。
+      检测到不可用时改渲染「村庄列表」占位视图 —— 不是死图，
+      每个村庄仍可点击进入打卡流程。
+    -->
     <map
+      v-if="mapAvailable"
       id="tencentMap"
       class="map-container"
       :latitude="latitude"
@@ -14,22 +22,53 @@
       :enable-3D="false"
       :enable-overlooking="false"
       :enable-rotate="false"
-      :enable-poi="false" 
+      :enable-poi="false"
       @markertap="onMarkerTap"
       @tap="onMapTap"
+      @error="onMapError"
     ></map>
 
-    
-    <cover-image 
-        class="map-title-img" 
+    <!-- 地图不可用时的占位视图 -->
+    <scroll-view v-else class="map-fallback" scroll-y="true">
+      <view class="fallback-head">
+        <text class="fallback-icon">🗺️</text>
+        <text class="fallback-title">地图暂不可用</text>
+        <text class="fallback-reason">{{ mapUnavailableReason }}</text>
+        <text class="fallback-hint">下面是全部打卡点，点击即可前往</text>
+      </view>
+
+      <view
+        class="village-item"
+        v-for="v in fallbackVillages"
+        :key="v.slug"
+        hover-class="village-item-hover"
+        @click="goVillage(v)"
+      >
+        <view class="village-info">
+          <text class="village-name">{{ v.title }}</text>
+          <text class="village-desc">{{ v.desc }}</text>
+        </view>
+        <text class="village-arrow">›</text>
+      </view>
+
+      <view class="fallback-foot">
+        <text class="fallback-foot-text">
+          H5 端配置腾讯地图 Key 后可恢复地图渲染
+        </text>
+      </view>
+    </scroll-view>
+
+
+    <cover-image
+        class="map-title-img"
         src="https://village-1369475595.cos.ap-guangzhou.myqcloud.com/static/title.png"
         mode="aspectFit"
     ></cover-image>
-    
-    
+
+
     <custom-tab-bar :current="0" class="tab-bar" />
-    
-    
+
+
     <daily-signin :visible="showSignin" @update:visible="showSignin = $event" />
   </view>
 </template>
@@ -37,6 +76,7 @@
 <script>
 import CustomTabBar from '@/components/custom-tab-bar/index.vue';
 import DailySignin from '@/components/daily-signin/daily-signin.vue';
+import { detectMapCapability, readMapKey } from '@/utils/map-capability.js';
 
 
 const logoSrc = 'https://mp-b88a8047-5a18-4ba9-b43c-d93de4363320.cdn.bspapp.com/cloudstorage/init-data/logo.png';
@@ -49,14 +89,17 @@ export default {
   data() {
     return {
       showSignin: false,
-      latitude: 23.00, 
+      latitude: 23.00,
       longitude: 115.40,
-      scale: 10.8, 
+      scale: 10.8,
       minScale: 9.8,
       maxScale: 15,
       mapCtx: null,
-      
-      
+
+      // Sprint 5.2：地图可用性
+      mapAvailable: true,
+      mapUnavailableReason: '',
+
       markers: [
         {
             id: 101,
@@ -146,13 +189,74 @@ export default {
       }
     }
   },
+  computed: {
+    /**
+     * 地图不可用时的占位列表
+     *
+     * 直接从本地 marker 常量派生 —— 不依赖任何后端接口或云函数，
+     * 保证离线/未启动后端时也能看到完整内容。
+     */
+    fallbackVillages () {
+      return (this.markers || [])
+        .filter(m => m && m.slug && m.id !== 999)   // 排除测试点
+        .map(m => ({
+          id: m.id,
+          slug: m.slug,
+          title: m.title,
+          desc: (m.callout && m.callout.content ? m.callout.content.split('\n').slice(1).join(' · ') : '') || '乡村美食打卡点',
+          latitude: m.latitude,
+          longitude: m.longitude
+        }))
+    }
+  },
+  onLoad () {
+    // Sprint 5.2：检测地图可用性
+    // H5 端没有腾讯地图 Key 时 <map> 渲染为空白 —— 改用占位视图
+    const cap = detectMapCapability({ mapKey: readMapKey() })
+    this.mapAvailable = cap.available
+    this.mapUnavailableReason = cap.reason
+    console.log('[home] 地图能力检测:', cap)
+  },
   onShow() {
     this.checkDailySignin();
   },
   onReady() {
-    this.initMap();
+    // 只有地图真正可用时才初始化地图上下文
+    if (this.mapAvailable) {
+      this.initMap();
+    } else {
+      console.log('[home] 地图不可用，跳过 initMap（改用占位视图）');
+    }
   },
   methods: {
+    /**
+     * 地图渲染错误回调
+     *
+     * 即便检测逻辑判定可用，实际渲染仍可能失败（Key 失效、SDK 加载失败等）。
+     * 此时降级为占位视图，而不是留一块空白。
+     */
+    onMapError (e) {
+      console.error('[home] 地图渲染失败，降级为占位视图:', e);
+      this.mapAvailable = false;
+      this.mapUnavailableReason = '地图渲染失败：' + ((e && (e.errMsg || e.detail)) || '未知错误');
+    },
+
+    /**
+     * 占位视图里点击村庄 → 进入打卡页
+     *
+     * 与地图 marker 点击走同一条路径，保证两种形态下行为一致。
+     */
+    goVillage (v) {
+      if (!v || !v.slug) return;
+      console.log('[home] 占位视图点击村庄:', v.title);
+      uni.navigateTo({
+        url: `/pages/choosedaka/choosedaka?slug=${v.slug}&locationId=${v.id}&lat=${v.latitude}&lng=${v.longitude}&name=${encodeURIComponent(v.title || '')}`,
+        fail: (err) => {
+          console.error('[home] 跳转打卡页失败:', err);
+          uni.showToast({ title: '页面跳转失败', icon: 'none' });
+        }
+      });
+    },
     checkDailySignin() {
         const key = 'last_signin_popup_date';
         const now = new Date();
@@ -400,6 +504,101 @@ page {
   width: 100%;
   height: 100%;
   position: relative;
+}
+
+/* Sprint 5.2：地图不可用时的占位视图 */
+.map-fallback {
+	width: 100%;
+	height: 100%;
+	background-color: #FFF9F0;
+	padding: 40rpx 32rpx 200rpx;
+	box-sizing: border-box;
+}
+
+.fallback-head {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	padding: 60rpx 20rpx 40rpx;
+}
+
+.fallback-icon {
+	font-size: 72rpx;
+	margin-bottom: 16rpx;
+}
+
+.fallback-title {
+	font-size: 34rpx;
+	font-weight: 600;
+	color: #5D4037;
+	margin-bottom: 12rpx;
+}
+
+.fallback-reason {
+	font-size: 24rpx;
+	color: #A1887F;
+	text-align: center;
+	line-height: 1.6;
+	padding: 0 20rpx;
+}
+
+.fallback-hint {
+	font-size: 26rpx;
+	color: #D87A46;
+	margin-top: 20rpx;
+	font-weight: 500;
+}
+
+.village-item {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	background-color: #FFFFFF;
+	border-radius: 24rpx;
+	padding: 28rpx 28rpx;
+	margin-bottom: 20rpx;
+	box-shadow: 0 4rpx 16rpx rgba(93, 64, 55, 0.06);
+}
+
+.village-item-hover {
+	background-color: #FFF3E0;
+}
+
+.village-info {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+}
+
+.village-name {
+	font-size: 30rpx;
+	font-weight: 600;
+	color: #5D4037;
+	margin-bottom: 8rpx;
+}
+
+.village-desc {
+	font-size: 24rpx;
+	color: #A1887F;
+}
+
+.village-arrow {
+	font-size: 44rpx;
+	color: #D7CCC8;
+	margin-left: 20rpx;
+}
+
+.fallback-foot {
+	display: flex;
+	justify-content: center;
+	padding: 40rpx 0;
+}
+
+.fallback-foot-text {
+	font-size: 22rpx;
+	color: #BCAAA4;
+	text-align: center;
+	line-height: 1.6;
 }
 
 .map-container {

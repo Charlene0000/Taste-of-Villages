@@ -35,6 +35,10 @@
  * 4. 所有映射关系都注明了原云函数的出处，便于对照
  */
 
+// Sprint 5.2：引入 URL 拼接工具
+// 后端存的是相对路径（/uploads/xxx），直接给 <image src> 在 H5/Web 端会裂图
+import { toAbsoluteUrl } from './url.js'
+
 /**
  * 村庄配置 —— 与原 getCheckInRecords 云函数中的 VILLAGES 常量保持一致。
  *
@@ -279,8 +283,9 @@ export function normalizeShopGoods (rows) {
 			id: row.id,
 			name: row.name || '',
 			cost: typeof row.cost === 'number' ? row.cost : 0,
-			img_url: row.image || '',
-			image: row.image || '',
+			// Sprint 5.2：商品图也转绝对 URL（后端可能存相对路径）
+			img_url: toAbsoluteUrl(row.image) || row.image || '',
+			image: toAbsoluteUrl(row.image) || row.image || '',
 			description: row.desc || '',
 			desc: row.desc || '',
 			stock: row.stock || 0
@@ -382,11 +387,17 @@ export function normalizeFood (row) {
  *
  * 原集合字段：{ _id, url, images(数组), locationName, title, ... }
  * Prisma 表的 images 是 JSON 字符串，需要解析回数组。
+ *
+ * Sprint 5.2：url / images 一律转成**绝对 URL**。
+ * 后端存的是相对路径 '/uploads/xxx.png'，
+ * 直接给 <image src> 在 H5/Web 端会裂图
+ * （浏览器把 '/uploads/...' 当成站点根路径，打到 dev server 而不是后端 3000 端口）。
  */
 export function normalizeUserPhotos (rows) {
 	const list = Array.isArray(rows) ? rows : []
 	return list.map(row => {
 		if (!row) return null
+
 		let images = row.images
 		if (typeof images === 'string') {
 			try {
@@ -398,11 +409,15 @@ export function normalizeUserPhotos (rows) {
 		if (!Array.isArray(images)) images = images ? [images] : []
 		if (!images.length && row.url) images = [row.url]
 
+		// 转绝对 URL
+		const absImages = images.map(toAbsoluteUrl).filter(Boolean)
+		const absUrl = toAbsoluteUrl(row.url)
+
 		return {
 			_id: row.id,
 			id: row.id,
-			url: row.url || '',
-			images,
+			url: absUrl,
+			images: absImages,
 			locationName: row.locationName || '',
 			title: row.title || '',
 			createTime: row.createTime

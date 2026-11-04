@@ -40,11 +40,26 @@ router.post('/chat', optionalAuth, async (req, res) => {
 			})
 		}
 
+		// Sprint 5.2：把当前登录用户查出来传给服务层
+		// 「我是谁」这类问题需要用户上下文（手机号/昵称/登录次数），
+		// 之前没传，所以工具拿到的永远是空用户 → 回答「当前未获取到用户信息」。
+		let user = null
+		if (req.user && req.user.uid) {
+			try {
+				const { getPrisma } = require('../db')
+				const prisma = getPrisma()
+				user = await prisma.user.findUnique({ where: { id: req.user.uid } })
+			} catch (e) {
+				console.error('[agent] 读取用户失败:', e.message)
+			}
+		}
+
 		const result = await agentService.answer(question.trim(), {
 			system,
 			history: Array.isArray(messages)
 				? messages.filter(m => m.role === 'user' || m.role === 'assistant')
 				: null,
+			user,
 			userId: req.user ? req.user.uid : null
 		})
 
