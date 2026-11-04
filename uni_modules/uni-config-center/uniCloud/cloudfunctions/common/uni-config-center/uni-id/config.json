@@ -71,46 +71,47 @@
       "codeExpiresIn": 300,
       "smsKey": "your-aliyun-sms-key-placeholder",
       "smsSecret": "your-aliyun-sms-secret-placeholder",
+      "_devModeNote": "模板 ID 必须为非空值。uni-id-co 的测试分支（验证码固定 123456）仅在 templateId 为空时触发，填入占位符后该分支永久不可达，从配置层杜绝固定验证码风险。开发期模拟由 common/app-config 的 dev.simulateSms 控制，默认关闭。",
 	  "scene": {
-	  		"templateId": "xxxxx",
+	  		"templateId": "your-sms-template-id-placeholder",
 	  		"login": {
-	  		  "templateId": "xxxxx",
+	  		  "templateId": "your-sms-template-id-placeholder",
 	  		  "codeExpiresIn": 240
 	  		},
 	  		"login-by-sms": {
-	  		  "templateId": "xxxxx",
+	  		  "templateId": "your-sms-template-id-placeholder",
 	  		  "codeExpiresIn": 240
 	  		},
 	  		"register": {
-	  		  "templateId": "xxxxx",
+	  		  "templateId": "your-sms-template-id-placeholder",
 	  		  "codeExpiresIn": 240
 	  		},
 	  		"bind": {
-	  		  "templateId": "xxxxx",
+	  		  "templateId": "your-sms-template-id-placeholder",
 	  		  "codeExpiresIn": 240
 	  		},
 	  		"bind-mobile": {
-	  		  "templateId": "15696",
+	  		  "templateId": "your-sms-template-id-placeholder",
 	  		  "codeExpiresIn": 240
 	  		},
 	  		"bind-mobile-by-sms": {
-	  		  "templateId": "xxxxx",
+	  		  "templateId": "your-sms-template-id-placeholder",
 	  		  "codeExpiresIn": 240
 	  		},
 	  		"unbind": {
-	  		  "templateId": "xxxxx",
+	  		  "templateId": "your-sms-template-id-placeholder",
 	  		  "codeExpiresIn": 240
 	  		},
 	  		"unbind-mobile": {
-	  		  "templateId": "xxxxx",
+	  		  "templateId": "your-sms-template-id-placeholder",
 	  		  "codeExpiresIn": 240
 	  		},
 	  		"unbind-mobile-by-sms": {
-	  		  "templateId": "xxxxx",
+	  		  "templateId": "your-sms-template-id-placeholder",
 	  		  "codeExpiresIn": 240
 	  		},
 	  		"reset-pwd-by-sms": {
-	  		  "templateId": "xxxxx",
+	  		  "templateId": "your-sms-template-id-placeholder",
 	  		  "codeExpiresIn": 240
 	  		}
 	  }

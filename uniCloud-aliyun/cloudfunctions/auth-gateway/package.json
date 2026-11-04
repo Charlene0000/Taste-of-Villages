@@ -1,0 +1,12 @@
+{
+  "name": "auth-gateway",
+  "version": "1.0.0",
+  "description": "登录统一入口与安全网关：CSPRNG 验证码、发送频控、错误次数锁定、手机号严格校验（外层包装 uni-id-co，不侵入其源码）",
+  "main": "index.js",
+  "author": "CharLene",
+  "license": "MIT",
+  "dependencies": {},
+  "extensions": {
+    "uni-cloud-jql": {}
+  }
+}

@@ -27,5 +27,11 @@
     "region": "ap-guangzhou",
     "secretId": "your-cos-secret-id-placeholder",
     "secretKey": "your-cos-secret-key-placeholder"
+  },
+  "dev": {
+    "_doc": "开发期开关。生产环境必须全部保持 false。",
+    "simulateSms": false,
+    "_simulateSmsNote": "开启后 auth-gateway 不真实下发短信，验证码写入云函数日志并在响应中返回 devCode 字段。仅用于无短信服务商的本地开发，生产必须关闭。",
+    "smsScene": "login-by-sms"
   }
 }

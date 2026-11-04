@@ -5,7 +5,12 @@
     "description": "跨境共生 · 乡村美食打卡小程序。基于 uni-app + uniCloud，含 AI 美食向导「饼饼」与自研 Agent 编排层、数字人交互层。",
     "main": "main.js",
     "scripts": {
-        "test": "node scripts/check-json.js"
+        "test": "node scripts/check-json.js",
+        "test:auth": "node scripts/verify-auth-gateway.js",
+        "test:session": "node scripts/verify-session-audit.js",
+        "test:agent": "node agent/tests/run-tests.js",
+        "test:avatar": "node digital-avatar/tests/run-tests.js",
+        "test:all": "node scripts/check-json.js && node scripts/verify-auth-gateway.js && node scripts/verify-session-audit.js && node agent/tests/run-tests.js && node digital-avatar/tests/run-tests.js"
     },
     "keywords": [
         "uni-app",
