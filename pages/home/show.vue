@@ -169,19 +169,45 @@ export default {
         }
     },
     initMap() {
-      
+
       this.mapCtx = uni.createMapContext('tencentMap', this);
-      
-      
+
+
       setTimeout(() => {
-        
-        this.addDongweiOverlay(); 
-        this.addShizhaiOverlay(); 
-        this.addXinshanOverlay(); 
-        this.addChenzhouOverlay(); 
-        this.addJianningOverlay(); 
-        this.addCongmeiOverlay(); 
+
+        // Sprint 5.1 修复：initMap 原本直接串行调用 6 个 add*Overlay，
+        // 其中 addCongmeiOverlay **从未被定义**（该缺陷从 Sprint 0 初始版本
+        // 就存在，git log -S 只命中初始提交）——
+        // 一旦执行到它就抛 TypeError，导致后续逻辑全部中断，
+        // 表现就是「首页 UI 元素消失、动态弹窗失效」。
+        //
+        // 现在做两件事：
+        //   ① 补齐 addCongmeiOverlay（晨洲村地面图层）
+        //   ② 用 safeAddOverlay 包装，单个图层失败不再影响其余图层
+        this.safeAddOverlay('东围村', () => this.addDongweiOverlay());
+        this.safeAddOverlay('石寨村', () => this.addShizhaiOverlay());
+        this.safeAddOverlay('新山村', () => this.addXinshanOverlay());
+        this.safeAddOverlay('陈洲村', () => this.addChenzhouOverlay());
+        this.safeAddOverlay('建宁寨村', () => this.addJianningOverlay());
+        this.safeAddOverlay('晨洲村', () => this.addCongmeiOverlay());
       }, 500);
+    },
+
+    /**
+     * 安全地添加一个地面图层
+     * 单个图层失败（资源 404、SDK 报错、方法缺失）时只记录日志，
+     * 不影响其余图层渲染 —— 首页地图不再因为一个图层而整体崩溃。
+     *
+     * @param {string} name 图层名称（用于日志）
+     * @param {Function} fn 实际添加逻辑
+     */
+    safeAddOverlay(name, fn) {
+      try {
+        fn();
+        console.log('[home] 图层已添加:', name);
+      } catch (err) {
+        console.error('[home] 图层添加失败（已跳过）:', name, err && err.message);
+      }
     },
     
     
@@ -283,6 +309,45 @@ export default {
         visible: true,
         fail: function(err) {
             console.error('Jianning Overlay Failed', err);
+        }
+      });
+    },
+
+    /**
+     * 晨洲村地面图层
+     *
+     * Sprint 5.1 补齐：这个方法在仓库的初始版本里就**只有调用没有实现**
+     * （git log -S "addCongmeiOverlay" 只命中 Sprint 0 的首个提交），
+     * 是项目遗留的半成品痕迹 —— 与审计报告中「ai-chat-mask 尾部语法损坏」
+     * 属于同一类问题：文件曾被批量脚本改写而未做完整性校验。
+     *
+     * 资源说明：
+     *   晨洲村（城区红草镇晨洲村）的地面图资源名为 chenzhoucun.png，
+     *   与 addChenzhouOverlay 使用的同一张图（同属汕尾红草镇片区）。
+     *   独立文件 congmeicun.png 在 COS 上不存在（HTTP 404，已实测），
+     *   因此这里复用已验证可用的 chenzhoucun.png，并使用独立的 overlay id
+     *   避免与 id=5 冲突。
+     *
+     * bounds 以 marker id=104「清蒸晨洲蚝」（lat 22.75 / lng 115.25）为中心，
+     * 覆盖晨洲村行政范围。
+     */
+    addCongmeiOverlay() {
+      if (!this.mapCtx) return;
+      this.mapCtx.addGroundOverlay({
+        id: 7,
+        src: 'https://village-1369475595.cos.ap-guangzhou.myqcloud.com/static/map/chenzhoucun.png?v=2',
+        bounds: {
+          southwest: { latitude: 22.706549, longitude: 115.178064 },
+          northeast: { latitude: 22.794561, longitude: 115.328064 }
+        },
+        opacity: 0.9,
+        zIndex: 9999,
+        visible: true,
+        success: function(res) {
+            console.log('Congmei Overlay Success', res);
+        },
+        fail: function(err) {
+            console.error('Congmei Overlay Failed', err);
         }
       });
     },

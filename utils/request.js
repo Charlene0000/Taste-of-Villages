@@ -101,8 +101,21 @@ function redirectToLogin () {
 
 	clearAuth()
 
-	const pages = getCurrentPages()
-	const current = pages.length ? pages[pages.length - 1].route : ''
+	// 获取当前路由。getCurrentPages 是 uni-app 注入的全局函数，
+	// 在非 uni-app 运行时（如单元测试、SSR、某些小程序兼容层）可能不存在 ——
+	// 直接调用会抛 ReferenceError，让 401 处理链整个崩掉，
+	// 表现是「接口失败但页面也白了」。
+	// 这里做防御：拿不到路由就不做「已在登录页」的判断，直接跳。
+	let current = ''
+	try {
+		if (typeof getCurrentPages === 'function') {
+			const pages = getCurrentPages()
+			current = pages.length ? pages[pages.length - 1].route : ''
+		}
+	} catch (e) {
+		console.warn('[request] 获取当前路由失败:', e && e.message)
+	}
+
 	// 已在登录页就不跳，避免循环
 	if (current && current.indexOf('login') !== -1) {
 		redirecting = false

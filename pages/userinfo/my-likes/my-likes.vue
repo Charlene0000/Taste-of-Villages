@@ -43,6 +43,8 @@
 </template>
 
 <script>
+import { checkAuth } from '@/utils/router-guard.js'
+
 export default {
   data() {
     return {
@@ -50,6 +52,8 @@ export default {
     }
   },
   onLoad() {
+    // Sprint 5.1：接入路由守卫（未登录时跳登录页）
+    if (!checkAuth({ route: 'pages/userinfo/my-likes/my-likes' })) return
     this.loadLikesList()
   },
   onShow() {

@@ -202,7 +202,10 @@ npm install
 # 2. 初始化 SQLite 数据库（生成 server/prisma/dev.db，建 10 张表）
 npx prisma db push
 
-# 3. 启动服务（默认 3000 端口）
+# 3. 导入种子数据（5 村庄 / 5 美食 / 7 商品 / 20 道题）
+npm run seed
+
+# 4. 启动服务（默认 3000 端口）
 npm run dev
 ```
 
@@ -225,8 +228,14 @@ curl http://localhost:3000/api/health
 # {"code":200,"message":"服务运行中","uptime":1.13,"devMode":true}
 ```
 
+> **`npm run seed` 不能跳过。** Sprint 5 用 Prisma 重建数据库时，
+> 原有 uniCloud 的种子数据没有一起迁移过来 ——
+> 跳过这一步，商城无商品、题库无题目、美食详情无正文、探索页无村庄列表。
+> 脚本是幂等的（先清空业务表再写入），可重复执行。
+> 只想校验种子文件格式而不写库：`node scripts/seed.js --check`。
+
 > `dev.db` 已被 `.gitignore` 排除，不会进入版本库。
-> 想从零重建，删掉 `server/prisma/dev.db` 后重新 `npx prisma db push` 即可。
+> 想从零重建，删掉 `server/prisma/dev.db` 后重新 `npx prisma db push && npm run seed` 即可。
 
 ---
 
@@ -292,17 +301,26 @@ curl http://localhost:3000/api/health
 
 ```bash
 # 根目录（前端 + 共享模块）
-npm test              # JSON 语法校验
-npm run test:agent    # Agent 编排层（53 项）
-npm run test:avatar   # 数字人交互层（15 项）
-npm run test:all      # 以上全部
+npm test                # JSON 语法校验 + 前端引用残留扫描
+npm run test:agent      # Agent 编排层（53 项）
+npm run test:avatar     # 数字人交互层（15 项）
+npm run test:normalizer # 数据归一化层（23 项）
+npm run test:all        # 以上全部
 
-# 后端（需先启动服务）
-cd server
-npm run test:api      # 后端接口与安全设计（39 项）
+# 需要后端在运行的两组（端到端）
+npm run test:contract   # 前端 → HTTP → 后端 → 归一化 全链路（16 项）
+cd server && npm run test:api   # 后端接口与安全设计（39 项）
 ```
 
 > 全部测试零依赖，不引入 jest / mocha，clone 完即可运行。
+> `test:contract` 与 `test:api` 需要后端已启动（`cd server && npm run dev`）。
+
+**新增的两道防线**（Sprint 5.1）：
+
+| 检查 | 命令 | 拦截什么 |
+|---|---|---|
+| **前端引用残留扫描** | `node scripts/check-frontend-refs.js` | 引用了已删除模块的标识符（`store.userInfo`、`uniCloud.*`、`uni_id_token`…）。这类残留在运行时抛 `ReferenceError`，页面直接白屏 —— 且批量替换脚本无法自行发现 |
+| **数据归一化层单测** | `node utils/tests/normalizer.test.js` | 前后端数据形状断层。批量脚本改了「怎么发请求」，但没改「后端返回什么」，页面就读到 `undefined` |
 
 ---
 
@@ -497,7 +515,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 | 1 | **APK 未实际打包** | ⬜ 未执行 | 无 DCloud 账号与打包凭据，且本地无 HBuilderX CLI。`build-apk.yml` 结构正确、YAML 校验通过，但**未在真实环境跑通**，不产出 APK |
 | 2 | **真机安装未验证** | ⬜ 未执行 | 无 Android 真机环境。「Android 10+ 安装不闪退」是待验证项，不是已验证结论 |
 | 3 | **真实短信未发送** | ⬜ 未执行 | 短信服务商未接入。`send-code` 的完整逻辑经 39 项后端测试验证（含频控、锁定），但**真实短信链路未跑通** |
-| 4 | **前端未在 HBuilderX 中实际运行** | ⬜ 未执行 | 44 处 API 调用已全部替换并通过静态语法校验，但**未在 HBuilderX 模拟器/真机中点过一遍**。真机调试还需把 `BASE_URL` 改为局域网 IP |
+| 4 | **前端未在 HBuilderX 中实际运行** | ⬜ 未执行 | Sprint 5.1 已修复批量替换引入的 12 类运行时断裂（详见 Technical Highlights 亮点 5/6），并新增 39 项前端测试 + 静态扫描器兜底；但**仍未在 HBuilderX 模拟器/真机中点过一遍**。真机调试还需把 `BASE_URL` 改为局域网 IP |
 | 5 | **git 未 push** | ⬜ 未执行 | 仓库无 remote，按约定不自行添加 |
 | 6 | **Canvas 渲染未在真机/模拟器验证** | ⬜ 未执行 | 渲染逻辑有单元测试覆盖（参数裁剪、表情切换、无 ctx 不抛异常），但实际画面效果需在 HBuilderX 中运行确认 |
 
@@ -517,20 +535,41 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 | 16 | **SQLite 单机存储** | 不适合多实例部署与高并发。生产环境建议换 PostgreSQL（Prisma 改一行 datasource 即可迁移） | 见 Future Work |
 | 17 | **文件上传存本地磁盘** | 多实例部署时图片不共享。生产建议换对象存储 | 见 Future Work |
 | 18 | **Android 存储权限用 READ/WRITE_EXTERNAL_STORAGE** | Android 13+ 已废弃该模式，需迁移到 `READ_MEDIA_IMAGES` | 打包上架前处理 |
+| 19 | **题目 slug 映射维护在前端** | `QUIZ_SLUG_MAP` 靠题目文本反查所属村庄。Prisma 的 `QuizQuestion` 没有 slug 字段（本轮约定不改后端）。新增题目时需同步维护这张表，否则新题会被归到 default 组 | 见 Future Work（给 schema 加 slug 字段） |
+| 20 | **答题进度不含 quiz 维度** | 原云函数查 `userQuizLogs` 表算答题进度，新后端没有这张表。进度分母仍按 4 计算，因此实际进度会偏低 0/25/50/75 | 见 Future Work（新增 quiz_logs 表） |
 
 ### 🟢 环境相关的注意事项
 
 | # | 项目 | 说明 |
 |---|---|---|
-| 19 | `server/.env` 的 `JWT_SECRET` 现为占位符 | **部署前必须替换**，否则 JWT 可被伪造。生成方法见 Production Deployment |
-| 20 | `server/.env` 的 `DEV_MODE` 现为 true | **生产必须改为 false**，否则验证码直接出现在接口响应里 |
-| 21 | 真机调试需改 `BASE_URL` | `http://localhost:3000` 在手机上指向手机自身，需改为电脑局域网 IP |
-| 22 | 旧 uniCloud 资源仍在云端 | 若之前关联过阿里云空间，那些云函数仍存在，但**本项目已不再使用**，可自行在控制台清理 |
+| 21 | `server/.env` 的 `JWT_SECRET` 现为占位符 | **部署前必须替换**，否则 JWT 可被伪造。生成方法见 Production Deployment |
+| 22 | `server/.env` 的 `DEV_MODE` 现为 true | **生产必须改为 false**，否则验证码直接出现在接口响应里 |
+| 23 | 真机调试需改 `BASE_URL` | `http://localhost:3000` 在手机上指向手机自身，需改为电脑局域网 IP |
+| 24 | 旧 uniCloud 资源仍在云端 | 若之前关联过阿里云空间，那些云函数仍存在，但**本项目已不再使用**，可自行在控制台清理 |
+| 25 | **必须执行 `npm run seed`** | Sprint 5 用 Prisma 重建数据库时未迁移原 uniCloud 的种子数据。跳过这一步，商城/题库/美食/村庄列表全为空 | Getting Started 第二步已补上该命令 |
 
 ---
 ## Features
 
 按模块列出，标注完成状态。
+
+### 🔧 Sprint 5.1 修复补丁（重构车祸的 12 类断裂）
+
+| 断裂 | 症状 | 修复 |
+|---|---|---|
+| Agent 传参用错字段 | `POST /api/agent/chat 400 缺少提问内容` | `agentApi.chat` 显式支持 `{message}` / `{messages}`，不再把整个对象当 message |
+| `checkStatus`/`tts` action 不存在 | AI 弹窗整体禁用、打卡页拍照入口禁用 | 本地恒定启用 + 探活日志；TTS 降级为不出声 |
+| 响应路径错误 | 拿到答案但页面不显示 | 兼容 `res.answer` 与 `res.result.choices[0]` |
+| `addCongmeiOverlay` 从未定义 | 首页 `TypeError`，地图与弹窗全挂 | 补齐实现 + `safeAddOverlay` 防御，单个图层失败不拖垮首页 |
+| `store.userInfo` 残留 | 勋章页/手账页 `ReferenceError` 白屏 | 改为读本地缓存 |
+| `userInfo._id` 不存在 | 已登录但用户数据不显示 | `withLegacyId` 补 `_id` 别名 |
+| 业务 ID 与主键混淆 | 打卡进度永远 0 | 村庄 `_id` 映射回 `'101'`–`'105'` |
+| 题库字段名不同 | 答题页空白 | 归一化补 `title`/`options`/`answerIndex` + 按 slug 过滤 |
+| 商品字段名不同 | 商城图片/描述空白 | 归一化补 `_id`/`img_url`/`description` |
+| `code === 0` 判定 | 美食详情永远「未找到」 | 兼容 200 与 0 |
+| `res.data.newPoints` 不存在 | 兑换后积分变 undefined | 优先服务端余额，否则本地扣减 |
+| 守卫在 `onLoad` 判断路由 | 未登录可绕过守卫 | 显式传路由，消除页面栈时序依赖 |
+| 种子数据未迁移 | 全新 clone 后所有列表为空 | `server/scripts/seed.js` + `server/data/seed.json` |
 
 ### 📱 业务功能（既有资产，已增强）
 
@@ -562,7 +601,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 | bcrypt 密码哈希 | 密码登录路径 | ✅ Sprint 5 |
 | 会话健康检查 | `GET /api/user/session`，返回有效期/即将过期/设备数/登录地 | ✅ |
 | 静默续期 | 剩余 < 600s 自动刷新，用户无感知 | ✅ |
-| 路由守卫 | 自研 `utils/router-guard.js`，5 个受保护页面 | ✅ Sprint 5 |
+| 路由守卫 | 自研 `utils/router-guard.js`，9 个受保护页面（打卡 5 + 我的 4），公开页面不受影响 | ✅ Sprint 5.1 |
 | 登录统计字段 | `loginCount` / `lastLoginAt` / `source` | ✅ |
 
 ### 🤖 Agent 编排层（Sprint 2 设计 + Sprint 5 迁至服务端）
@@ -748,6 +787,102 @@ Sprint 1 用 `auth-gateway` 做**外层薄包装**：
 > Express、Prisma、jsonwebtoken 全部以标准方式使用，不 fork、不魔改。
 
 ---
+
+### 亮点 5 · 协议适配层：把「换了后端」变成可验证的工程
+
+**问题**
+
+Sprint 5 把后端从 uniCloud 云函数换成 Express + Prisma 时，
+我用了脚本批量替换 44 处 `uniCloud.callFunction`。脚本改得了「怎么发请求」，
+却改不了「后端返回什么」——
+
+| 原云函数返回 | 新后端返回（Prisma 原始行） | 页面读什么 | 结果 |
+|---|---|---|---|
+| `getCheckInRecords` → 带 `name`/`progress` 的聚合数组 | `check_in_places` 表的行，只有 `locationId`/`type` | `item.name`、`item.progress` | 勋章页/手账页全是 `undefined` |
+| `get_quiz_questions` → 按 slug 过滤 + `title`/`options` 数组 | 全量行，`options` 是 JSON **字符串** | `q.title`、`q.options` | 答题页空白 |
+| `get_village_info` → `_id` 是业务 ID `'101'` | `villages.id` 是自增整数 `1` | `village._id` 当作 locationId | 打卡记录与进度**全部错位** |
+| `userInit` → `{ points }` | 同 | `res.data.points` | 积分不显示 |
+
+更隐蔽的是 `userInfo._id`：Prisma 主键叫 `id`，
+而前端有 10+ 处读 `_id`（uniCloud 时代的字段名）——
+于是「已登录但用户数据不显示」。
+
+**机制**
+
+不逐页改页面代码（风险高、易漏），而是在 `utils/auth.js` 与新文件
+`utils/normalizer.js` 之间建一层**协议适配**：
+
+```
+页面  ──►  businessApi.getCheckInRecords()
+              │
+              ├─ withData(promise, normalizer, params)   统一取 data、套归一化器
+              ├─ withUserParam(params)                   openid → userId 映射
+              └─ normalizeCheckInRecords(rows)           Prisma 行 → 原云函数形状
+                        │
+                        └─ VILLAGE_CONFIG（前端配置）    业务 ID ↔ slug ↔ 名称
+```
+
+四个关键设计：
+
+1. **业务 ID 与数据库主键分离**。村庄的 `_id` 映射回 `'101'`–`'105'`
+   （原云函数的业务 ID），数据库主键保留在 `dbId`。
+   打卡记录按 `locationId` 关联，两者必须用同一套 ID —— 否则进度永远是 0。
+2. **`_id` 别名**。`withLegacyId(user)` 给用户对象补 `_id = id`，
+   10+ 处页面代码一行不用改。
+3. **前端持有静态配置**。`VILLAGE_CONFIG` 与 `QUIZ_SLUG_MAP` 放在前端，
+   因为后端 schema 没有 slug 字段且本轮约定不改后端。
+4. **契约不匹配处做适配而非绕过**。`quizCheckIn` 的前后端契约完全不同
+   （前端交整卷 `answers[]`，后端收单题 `questionId`+`answer`），
+   适配层用前端本地题库判分，再把 `doneForLocation`/`score` 补回响应。
+
+**结果**
+
+- **39 项前端单测**（归一化层 23 + 端到端契约 16）全绿
+- 端到端验证：登录 → 打卡 → 落库 → **进度从 0 变成 25**（业务 ID 对齐的直接证据）
+- 页面代码改动量趋近于零 —— 修复集中在 1 个新文件 + 1 个 API 层
+- 后端 `src/` **零改动**（`git status server/src/` 为空）
+
+---
+
+### 亮点 6 · 用静态扫描器给批量替换装上「安全网」
+
+**问题**
+
+批量脚本能改「调用点」，改不了「引用点」。
+Sprint 5 删除 `uni-id-pages` 模块时清掉了它的 `import`，
+却留下了两处 `store.userInfo` 的**使用点**：
+
+```js
+computed: {
+  userInfo() {
+    return store.userInfo   // ← store 未定义
+  }
+}
+```
+
+运行时抛 `ReferenceError: store is not defined`，
+computed 求值失败 → **勋章页与手账页直接白屏**。
+这类问题编译器不报、静态检查不查，只有真机点一遍才会暴露。
+
+**机制**
+
+写 `scripts/check-frontend-refs.js`（零依赖），做两层检查：
+
+| 层 | 规则 | 误报率 |
+|---|---|---|
+| **精确层** | 已删除模块的残留：`store.userInfo` / `uniIdPageInit` / `uniCloud.*` / `uni_id_token` / `uni-id-pages` … | **零误报** —— 这些名字在当前架构下根本不该出现 |
+| **启发式层** | 裸标识符未被定义/导入 | 有误报（模板作用域变量），仅作提示 |
+
+精确层直接决定退出码，**已删除模块残留引用为零**即通过。
+
+**结果**
+
+- 扫出并修复 2 处 `store.userInfo` 残留（勋章页 + 手账页白屏的元凶）
+- 接入 `npm test`，此后每次重构都有这道防线
+- 顺带修掉 `request.js` 里 `getCurrentPages()` 未定义会抛 `ReferenceError`
+  的隐患 —— 401 处理链原本会因此整体崩溃
+
+---
 ## Database Schema
 
 > 数据库：**SQLite**（本地文件 `server/prisma/dev.db`），ORM：**Prisma**。
@@ -850,7 +985,8 @@ trace 是调试用的短期数据，落库会带来额外的隐私与清理成�
 | **Sprint 2** | Agent 编排层 | `agent/` 完整目录（planner/executor/memory/fallback/trace/工具注册表/双适配器）；53 项单测；Agent 演示页 | `989d89d` |
 | **Sprint 3** | 数字人交互层 | `digital-avatar/` 完整目录（Canvas 2D 渲染器/口型桥接/控制器/TTS 适配器）；15 项单测；`avatar-speak` 工具打通 Agent 联动 | `08e2ed1` |
 | **Sprint 4** | 打包配置与上线文档 | Android 权限收敛；`build-apk.yml` CI；README 补全；五阶段上线手册 | `256aa09` |
-| **Sprint 5** | **脱离 uniCloud + 搭建真实 HTTP 后端** | **`server/` 独立后端工程（Express + Prisma + SQLite）；44 处 uniCloud 调用全部替换；手写登录页与用户中心；自研路由守卫；Agent 编排迁至服务端** | 本次提交 |
+| **Sprint 5** | **脱离 uniCloud + 搭建真实 HTTP 后端** | **`server/` 独立后端工程（Express + Prisma + SQLite）；44 处 uniCloud 调用全部替换；手写登录页与用户中心；自研路由守卫；Agent 编排迁至服务端** | `256aa09` → 本次提交 |
+| **Sprint 5.1** | **重构车祸修复补丁** | **12 类运行时断裂修复；`utils/normalizer.js` 协议适配层；39 项前端测试；`scripts/check-frontend-refs.js` 静态扫描器；种子数据迁移** | 本次提交 |
 
 ### Sprint 5 的架构重构决策
 
@@ -878,6 +1014,7 @@ trace 是调试用的短期数据，落库会带来额外的隐私与清理成�
 | S3 | 15/15 · 口型长度/值域/单调三项性质 · stop 复位 · 覆盖无双动画 | ✅ |
 | S4 | JSON 91 个全绿 · workflow YAML 校验通过 · README 全部章节有实质内容 | ✅ |
 | S5 | 后端 39/39 · 全仓库 uniCloud 零残留 · 44 处调用替换 · 数据实测落库 · Agent 四场景实测 | ✅ |
+| S5.1 | 前端归一化 23/23 · 端到端契约 16/16 · 残留引用扫描零命中 · 26 个 .vue 语法全绿 · 打卡进度 0→25 实测 | ✅ |
 
 ### 全程守住的边界
 

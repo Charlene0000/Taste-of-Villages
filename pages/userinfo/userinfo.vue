@@ -87,6 +87,7 @@ import { userApi, authApi } from '@/utils/auth.js'
 import { getUserInfo, setUserInfo } from '@/utils/request.js'
 import { audit } from '@/utils/session.js'
 import { upload } from '@/utils/request.js'
+import { checkAuth } from '@/utils/router-guard.js'
 
 export default {
 	data () {
@@ -113,6 +114,12 @@ export default {
 			return Math.max(0, Math.floor(diff / (1000 * 60 * 60 * 24)))
 		}
 	},
+	onLoad () {
+		// Sprint 5.1：用户中心在 authRouter.needLogin 列表中，
+		// 但此前未接入 checkAuth —— 手动输入 URL 可绕过登录。
+		// 这里接入守卫，并显式传路由（避免 onLoad 时页面栈时序问题）。
+		if (!checkAuth({ route: 'pages/userinfo/userinfo' })) return
+	},
 	onShow () {
 		this.loadProfile()
 	},
@@ -120,6 +127,11 @@ export default {
 		async loadProfile () {
 			try {
 				const res = await userApi.profile()
+				console.log('[userinfo] profile 响应:', {
+					code: res && res.code,
+					hasUser: !!(res && res.user),
+					userId: res && res.user ? res.user.id : null
+				})
 				if (res && res.user) {
 					this.user = res.user
 					this.editNickname = res.user.nickname || ''

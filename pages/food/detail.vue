@@ -108,12 +108,21 @@ import { businessApi } from '@/utils/auth.js'
 			async fetchFoodInfo(slug) {
 				this.loading = true;
 				try {
+					console.log('[food/detail] 请求美食信息, slug =', slug);
 					const res = await businessApi.get_food_info({ slug: slug });
-					
-					if (res.code === 0) {
+
+					// Sprint 5.1 修复：
+					// 原云函数 get_food_info 成功时返回的是 `code: 0`（非 200），
+					// 这里原本只判 `res.code === 0`。
+					// 但新后端统一返回 `code: 200` —— 于是判断永远不成立，
+					// 美食详情页一直走「未找到美食信息」分支（表现为白屏/空内容）。
+					// 现在两个码都接受。
+					console.log('[food/detail] 响应:', { code: res && res.code, hasData: !!(res && res.data) });
+
+					if (res && (res.code === 200 || res.code === 0) && res.data) {
 						const data = res.data;
 						if (data.story_paragraphs && Array.isArray(data.story_paragraphs)) {
-							data.story_paragraphs = data.story_paragraphs.map(p => 
+							data.story_paragraphs = data.story_paragraphs.map(p =>
 								p.replace(/<text class="highlight">/g, '<span style="color: #D87A46; font-weight: bold; background: linear-gradient(to top, rgba(216, 122, 70, 0.1) 50%, transparent 50%); display: inline-block;">')
 								 .replace(/<\/text>/g, '</span>')
 							);
@@ -126,7 +135,7 @@ import { businessApi } from '@/utils/auth.js'
 						});
 					}
 				} catch (e) {
-					console.error("Cloud Function Error Details:", e);
+					console.error("[food/detail] 加载失败:", e);
 					uni.showModal({
 						title: '加载失败',
 						content: '错误信息: ' + (e.message || JSON.stringify(e)),

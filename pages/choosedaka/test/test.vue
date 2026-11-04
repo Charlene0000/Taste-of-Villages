@@ -142,7 +142,7 @@ export default {
     },
 	onLoad(options) {
 	  // 路由守卫：未登录访问受保护页面时跳登录
-	  if (!checkAuth()) return
+	  if (!checkAuth({ route: 'pages/choosedaka/test/test' })) return
 
         const info = uni.getSystemInfoSync();
         this.statusBarHeight = info.statusBarHeight || 20;

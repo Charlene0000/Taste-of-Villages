@@ -95,7 +95,14 @@ export default {
 			return this.medalList.length
 		},
 		userInfo() {
-			return store.userInfo
+			// Sprint 5.1 修复：
+			// 原代码是 `return store.userInfo` —— 那是 uni-id-pages 的响应式 store，
+			// Sprint 5 删除 uni-id-pages 模块时 import 被移除，但**使用点残留**，
+			// 于是 computed 求值时抛 `ReferenceError: store is not defined`，
+			// 整个勋章页崩溃（表现为白屏 / 无法进入）。
+			//
+			// 现在改为直接读本地缓存（getUserInfo 已在 import 中）。
+			return getUserInfo() || {}
 		}
 	},
 	methods: {
@@ -103,8 +110,14 @@ export default {
 			uni.navigateBack()
 		},
 		async fetchData() {
-			const openid = this.userInfo._id || uni.getStorageSync('app_user_info')._id;
-			if (!openid) return;
+			// Sprint 5.1：_id 别名由 utils/auth.js 补齐，这里同时兜底 id（Prisma 主键）
+			const info = this.userInfo || {}
+			const cached = uni.getStorageSync('app_user_info') || {}
+			const openid = info._id || info.id || cached._id || cached.id;
+			if (!openid) {
+				console.warn('[achievements] 未登录，跳过勋章数据加载')
+				return;
+			}
 			
 			try {
 				this.loading = true;
@@ -115,12 +128,12 @@ export default {
 					this.medalList = res.data.map((item, index) => {
 						const colors = ['#E57373', '#81C784', '#64B5F6', '#FFB74D', '#9575CD', '#4DB6AC'];
 						return {
-							name: item.name + '勋章',
-							desc: `您在${item.name}的探索进度已达${item.progress}%，${item.progress >= 100 ? '已完全点亮此印记。' : '继续努力解锁全部成就吧！'}`,
-							unlocked: item.progress > 0, // 只要有进度就视为解锁初步印记
-							date: item.progress >= 100 ? '已圆满' : '探索中',
+							name: (item.name || '未知') + '勋章',
+							desc: `您在${item.name || '未知'}的探索进度已达${item.progress || 0}%，${(item.progress || 0) >= 100 ? '已完全点亮此印记。' : '继续努力解锁全部成就吧！'}`,
+							unlocked: (item.progress || 0) > 0, // 只要有进度就视为解锁初步印记
+							date: (item.progress || 0) >= 100 ? '已圆满' : '探索中',
 							color: colors[index % colors.length],
-							progress: item.progress
+							progress: item.progress || 0
 						}
 					});
 				}

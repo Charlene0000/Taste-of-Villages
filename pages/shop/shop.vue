@@ -282,21 +282,47 @@ export default {
 
 			uni.showLoading({ title: '兑换中...' })
 			try {
-				const res = await businessApi.purchaseItem({ 
-						openid: this.openid, 
-						itemId: item._id, 
-						itemName: item.name, 
+				const res = await businessApi.purchaseItem({
+						openid: this.openid,
+						itemId: item._id,
+						itemName: item.name,
 						cost: item.cost,
-						imgUrl: item.img_url || item.emoji 
+						imgUrl: item.img_url || item.emoji
 					})
-				
+
 				const r = res
 				if (r && r.code === 200) {
 					uni.showToast({ title: '兑换成功!', icon: 'success' })
-                    this.animatePoints(this.displayPoints || this.points || 0, r.data.newPoints);
-					this.points = r.data.newPoints
-                    
-                    
+
+					// Sprint 5.1 修复：
+					// 后端 purchaseItem 返回的是 { code, message, data: order }，
+					// **没有 newPoints 字段**。
+					// 原代码读 r.data.newPoints → undefined，
+					// 于是 this.points 被赋成 undefined，积分显示直接消失。
+					//
+					// 现在：优先用服务端返回的余额；没有则用本地值减去花费。
+					const serverPoints = r.data && typeof r.data.newPoints === 'number'
+						? r.data.newPoints
+						: (typeof r.data && typeof r.data.points === 'number'
+							? r.data.points
+							: null)
+
+					const nextPoints = serverPoints !== null
+						? serverPoints
+						: Math.max(0, (this.points || 0) - (item.cost || 0))
+
+					console.log('[shop] 兑换成功:', {
+						服务端余额: serverPoints,
+						本地扣减后余额: nextPoints
+					})
+
+					this.animatePoints(this.displayPoints || this.points || 0, nextPoints)
+					this.points = nextPoints
+					this.displayPoints = nextPoints
+
+					// 刷新订单与积分（服务端是权威来源）
+					this.fetchMyItems()
+					this.fetchPoints()
 				} else {
 					uni.showToast({ title: r.message || '兑换失败', icon: 'none' })
 				}

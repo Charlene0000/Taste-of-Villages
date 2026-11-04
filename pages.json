@@ -285,7 +285,10 @@
 			"pages/choosedaka/photo/photo",
 			"pages/choosedaka/test/test",
 			"pages/choosedaka/cook/cook",
-			"pages/userinfo/userinfo"
+			"pages/userinfo/userinfo",
+			"pages/userinfo/my-photos/my-photos",
+			"pages/userinfo/checkin-records/checkin-records",
+			"pages/userinfo/my-likes/my-likes"
 		],
 		"resToLogin": true
 	}

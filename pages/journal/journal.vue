@@ -86,7 +86,12 @@ export default {
 	},
 	computed: {
 		userInfo() {
-			return store.userInfo
+			// Sprint 5.1 修复：
+			// 原代码是 `return store.userInfo` —— uni-id-pages 的响应式 store，
+			// Sprint 5 删除了该模块，import 已移除但**使用点残留**，
+			// computed 求值时抛 `ReferenceError: store is not defined` → 手账页崩溃。
+			// 现在直接读本地缓存（getUserInfo 已在 import 中）。
+			return getUserInfo() || {}
 		}
 	},
 	methods: {
@@ -94,8 +99,14 @@ export default {
 			uni.navigateBack()
 		},
 		async fetchData() {
-			const openid = this.userInfo._id || uni.getStorageSync('app_user_info')._id;
-			if (!openid) return;
+			// Sprint 5.1：_id 别名由 utils/auth.js 补齐，这里同时兜底 id
+			const info = this.userInfo || {}
+			const cached = uni.getStorageSync('app_user_info') || {}
+			const openid = info._id || info.id || cached._id || cached.id;
+			if (!openid) {
+				console.warn('[journal] 未登录，跳过手账数据加载')
+				return;
+			}
 			
 			try {
 				this.loading = true;
@@ -103,18 +114,18 @@ export default {
 				
 				if (res && res.code === 200) {
 					// 过滤出有进度的记录
-					const records = res.data.filter(item => item.progress > 0);
+					const records = res.data.filter(item => (item.progress || 0) > 0);
 					
 					this.journalEntries = records.map((item, index) => {
 						const comments = [
-							`在${item.name}留下了脚印，这里的空气都带着泥土的清香呢！`,
-							`${item.name}的风景真的不错，我已经把它收进我的私人珍藏集啦~`,
-							`哇，你在${item.name}的探索进度已经达到${item.progress}%了，加油呀！`,
-							`下一次我们要不要更深入地去了解一下${item.name}的故事呢？`
+							`在${item.name || '未知'}留下了脚印，这里的空气都带着泥土的清香呢！`,
+							`${item.name || '未知'}的风景真的不错，我已经把它收进我的私人珍藏集啦~`,
+							`哇，你在${item.name || '未知'}的探索进度已经达到${item.progress || 0}%了，加油呀！`,
+							`下一次我们要不要更深入地去了解一下${item.name || '未知'}的故事呢？`
 						];
 						return {
 							date: item.lastTime || '最近',
-							location: item.name,
+							location: item.name || '未知',
 							image: item.image,
 							comment: comments[index % comments.length],
 							rotate: (Math.random() * 6 - 3).toFixed(1)

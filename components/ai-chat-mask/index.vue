@@ -192,17 +192,32 @@ export default {
     async checkFeatureStatus() {
         this.isLoadingFeature = true;
         try {
-            const res = await agentApi.chat({ action: 'checkStatus' });
-            
-            if (res && res.enable === true) {
-                this.isFeatureEnabled = true;
-            } else {
-                this.isFeatureEnabled = false;
+            // Sprint 5.1 修复：
+            // 原代码调用 agentApi.chat({ action: 'checkStatus' })，
+            // 但后端 /api/agent/chat 只接受 { message } / { messages }，
+            // 收到 action 对象后判定「缺少提问内容」返回 400，
+            // 于是 isFeatureStatus 恒为 false —— AI 弹窗被整体禁用。
+            //
+            // 现在：本地后端的 Agent 零外部依赖、始终可用，
+            // 直接置为 enabled，同时保留一次轻量探活（失败也不阻断）。
+            this.isFeatureEnabled = true;
+            console.log('[ai-chat-mask] AI 功能已启用（本地知识库模式，零外部依赖）');
+
+            try {
+                const res = await agentApi.chat('你好');
+                console.log('[ai-chat-mask] Agent 探活结果:', {
+                    code: res && res.code,
+                    source: res && res.source,
+                    degraded: res && res.degraded,
+                    answer: res && res.answer ? String(res.answer).slice(0, 40) : null
+                });
+            } catch (probeErr) {
+                // 探活失败不影响使用（后端可能未启动），仅提示
+                console.warn('[ai-chat-mask] Agent 探活失败（后端未启动？）：', probeErr && probeErr.message);
             }
         } catch (e) {
-            console.error('Failed to check feature status:', e);
-            
-            this.isFeatureEnabled = false;
+            console.error('[ai-chat-mask] checkFeatureStatus 异常:', e);
+            this.isFeatureEnabled = true; // 保守放行
         } finally {
             this.isLoadingFeature = false;
         }
@@ -278,39 +293,65 @@ export default {
       6. 回答仅使用纯文本，禁止使用*、#、-、加粗、列表等任何格式符号。`;
       
       try {
+          // Sprint 5.1 修复（400「缺少提问内容」的根因）：
+          // 原代码传的是 { action:'chat', uid, data:{ messages:[...] } }，
+          // 但后端 /api/agent/chat 只认顶层的 message / messages，
+          // action 与嵌套的 data.messages 都被忽略 →
+          // 后端拿不到任何提问内容 → 400 agent-missing-message。
+          //
+          // 现在按后端契约传参：顶层 message + 可选 messages。
+          console.log('[ai-chat-mask] 发送提问:', userQuestion);
+
           const res = await agentApi.chat({
-                  action: 'chat',
-                  uid: (uni.getStorageSync('app_user_info') || uni.getStorageSync('userInfo'))?._id || '',
-                  data: {
-                      messages: [
-                        { role: 'system', content: systemPrompt },
-                        { role: 'user', content: userQuestion }
-                      ]
-                  }
-              });
-          
+              message: userQuestion,
+              messages: [
+                  { role: 'user', content: userQuestion }
+              ],
+              system: systemPrompt
+          });
+
+          console.log('[ai-chat-mask] Agent 响应:', {
+              code: res && res.code,
+              source: res && res.source,
+              degraded: res && res.degraded,
+              hasAnswer: !!(res && res.answer)
+          });
+
           this.isSending = false;
-          
-          if (res && res.code === 200 && res?.choices?.[0]) {
-             let reply = res.choices[0].message.content || '我暂时无法回答这个问题';
-             
-             
+
+          // 后端同时提供两种取值路径：
+          //   ① res.answer                       —— 新契约（推荐）
+          //   ② res.result.choices[0].message.content —— OpenAI 兼容结构
+          let reply = ''
+          if (res && typeof res.answer === 'string' && res.answer.trim()) {
+              reply = res.answer
+          } else if (res && res.result && res.result.choices && res.result.choices[0]) {
+              reply = res.result.choices[0].message.content || ''
+          } else if (res && res.choices && res.choices[0]) {
+              reply = res.choices[0].message.content || ''
+          }
+
+          if (res && res.code === 200 && reply) {
              reply = reply.replace(/\*/g, '').trim();
-             
-             
+
              this.messages[this.messages.length - 1].content = '';
              this.currentReply = reply;
              this.startTypingCustom(reply);
           } else {
              this.isTyping = false;
-             this.messages[this.messages.length - 1].content = '网络繁忙，请稍后再试';
-             console.error('Service Error:', res);
+             const fallback = (res && res.capabilities && res.capabilities.length)
+                 ? res.capabilities.map(c => c.name || c).join('、')
+                 : '';
+             this.messages[this.messages.length - 1].content = fallback
+                 ? `我目前只能回答这些问题：${fallback}`
+                 : '这个问题我还答不上来，换个关于美食的话题聊聊吧～';
+             console.error('[ai-chat-mask] Service Error:', res);
           }
       } catch (e) {
           this.isSending = false;
           this.isTyping = false;
-          this.messages[this.messages.length - 1].content = '网络错误';
-          console.error('Call Function Error:', e);
+          this.messages[this.messages.length - 1].content = '网络错误：' + (e && e.message ? e.message : '未知错误');
+          console.error('[ai-chat-mask] Call API Error:', e);
       }
     },
     startTypingCustom(answer) {
@@ -333,42 +374,38 @@ export default {
       }
     },
     async textToSpeech(text) {
-        let ttsText = text.substring(0, 100); 
+        let ttsText = text.substring(0, 100);
         const timestamp = Math.floor(Date.now() / 1000);
         const date = new Date(timestamp * 1000).toISOString().split('T')[0];
-        
+
         const selectedLang = this.languages.find(l => l.label === this.currentLanguage) || this.languages[0];
-        
+
         const params = {
             text: ttsText,
             vcn: selectedLang.vcn || 'xiaoyan',
-            speed: 50, 
-            volume: 50, 
-            pitch: 50  
+            speed: 50,
+            volume: 50,
+            pitch: 50
         };
-        
-        try {
-            console.log('Sending TTS request to Cloud Function...');
-            
-            
-            const cloudRes = await agentApi.chat({
-                    action: 'tts',
-                    data: {
-                        params: params,
-                        timestamp: timestamp,
-                        date: date
-                    }
-                });
-            
-            if (cloudRes && cloudRes.code === 200 && cloudRes.audio) {
-                console.log('TTS audio received from cloud');
-                this.playAudio(cloudRes.audio);
-            } else {
-                console.error('Failed to get audio from cloud:', cloudRes);
-            }
-        } catch (e) {
-            console.error('Cloud function error:', e);
-        }
+
+        // Sprint 5.1 修复：
+        // 原代码调用 agentApi.chat({ action:'tts', data:{ params } })，
+        // 但后端 /api/agent/chat 没有 tts 语义 —— 它会被当作「提问」
+        // 送进知识库检索，必然 400（缺少提问内容）或返回无关答案。
+        //
+        // 现在的策略：**TTS 为可选能力，默认关闭**。
+        // 未配置讯飞凭据时只走口型动画 + 打字机，不出声 ——
+        // 这与 Sprint 3 设计的 noop TTS 适配器语义一致。
+        console.log('[ai-chat-mask] TTS 跳过（未配置语音服务，仅口型动画）:', {
+            text: ttsText,
+            vcn: params.vcn,
+            date
+        });
+
+        // 若将来接入真实 TTS，只需在此处改为：
+        //   const res = await post('/api/tts', { text: ttsText, vcn: params.vcn })
+        //   if (res && res.audio) this.playAudio(res.audio)
+        // 当前不调用任何外部服务，零费用。
     },
     playAudio(base64) {
         console.log('playAudio called');

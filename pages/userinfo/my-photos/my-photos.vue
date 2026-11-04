@@ -66,6 +66,7 @@
 <script>
 import { businessApi } from '@/utils/auth.js'
 import { upload } from '@/utils/request.js'
+import { checkAuth } from '@/utils/router-guard.js'
 export default {
   data() {
     return {
@@ -74,7 +75,8 @@ export default {
     }
   },
   onLoad() {
-    
+    // Sprint 5.1：接入路由守卫（未登录时跳登录页）
+    if (!checkAuth({ route: 'pages/userinfo/my-photos/my-photos' })) return
     this.loadPhotosList()
   },
   onShow() {

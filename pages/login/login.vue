@@ -96,7 +96,18 @@ export default {
 			submitting: false,
 			errorMsg: '',
 			devCode: '',
-			showPolicy: false
+			showPolicy: false,
+			// Sprint 5.1：登录成功后要返回的页面（由路由守卫通过 ?redirect= 传入）
+			redirect: ''
+		}
+	},
+	onLoad (options) {
+		// Sprint 5.1：接收守卫传来的 redirect 参数。
+		// 原实现忽略它，登录后只能 navigateBack / reLaunch 到封面页，
+		// 用户点「登录」进去后回不到原本想去的页面 —— 表现为「跳转异常」。
+		if (options && options.redirect) {
+			this.redirect = decodeURIComponent(options.redirect)
+			console.log('[login] 登录后将返回:', this.redirect)
 		}
 	},
 	onUnload () {
@@ -178,7 +189,25 @@ export default {
 					title: res && res.isNewUser ? '注册成功' : '登录成功',
 					icon: 'none'
 				})
-				// 返回上一页；没有上一页则回到首页
+
+				// Sprint 5.1：优先跳回 redirect 指定的页面；
+				// 没有 redirect 时回退到原有逻辑（返回上一页 / 回到封面页）。
+				if (this.redirect) {
+					const target = this.redirect
+					this.redirect = ''
+					// redirect 是页面路由（不带前导斜杠），需补全
+					const url = target.charAt(0) === '/' ? target : '/' + target
+					console.log('[login] 登录成功，跳回:', url)
+					uni.redirectTo({
+						url,
+						fail: (err) => {
+							console.warn('[login] redirectTo 失败，改用 reLaunch:', err && err.message)
+							uni.reLaunch({ url: '/pages/index/cover' })
+						}
+					})
+					return
+				}
+
 				const pages = getCurrentPages()
 				if (pages.length > 1) {
 					uni.navigateBack()

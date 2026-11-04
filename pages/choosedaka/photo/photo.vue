@@ -99,7 +99,7 @@ export default {
   },
   onLoad(options) {
     // 路由守卫：未登录访问受保护页面时跳登录
-    if (!checkAuth()) return
+    if (!checkAuth({ route: 'pages/choosedaka/photo/photo' })) return
 
     if (options) {
       if (options.locationId) this.locationId = options.locationId

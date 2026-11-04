@@ -1,0 +1,359 @@
+{
+  "villages": [
+    {
+      "name": "红桃粿",
+      "slug": "taohuaguo",
+      "latitude": 22.97,
+      "longitude": 115.39,
+      "intro": "背靠鹿境山、前临丽江河，是广东省文化和旅游特色村、广东省十大美丽乡村，也是海丰八景 “丽江月色” 的所在地。大革命时期，在彭湃带领下成为农民运动重要据点，涌现 “一门七英烈”“父子三烈士”，现存农会旧址、赤卫队队部等红色史迹。如今以 “红色教育 + 田园休闲” 为核心，建成革命纪念馆、火炬广场，还原客家民俗生活场景。",
+      "image": "https://village-1369475595.cos.ap-guangzhou.myqcloud.com/static/village/xinshan/xinshan.png"
+    },
+    {
+      "name": "石寨菜包粿",
+      "slug": "caibaoguo",
+      "latitude": 23.013,
+      "longitude": 115.75,
+      "intro": "始建于唐武德年间，因村寨用石头筑成得名 “石寨”，是中国历史文化名村、中国传统村落、中国乡村旅游模范村。村落北依狮仔嶂山脉，南邻大旗山，以 “蜘蛛网状” 布局规划民居，现存清代私塾 16 家，历史上出过 3 进士、7 举人、50 贡生，有 “文墨乡” 美誉。如今以 “古村落生态博物馆” 为定位，融合农耕产业与文旅体验，2025 年成为汕尾网红文旅村。",
+      "image": "https://village-1369475595.cos.ap-guangzhou.myqcloud.com/static/village/shizhai/shizhai.png"
+    },
+    {
+      "name": "遮浪玛仔",
+      "slug": "shaqima",
+      "latitude": 22.786961,
+      "longitude": 115.565232,
+      "intro": "东尾村是汕尾红海湾经济开发区遮浪街道下辖行政村，曾是海陆丰农民革命运动的重要活动地，涌现罗章彩等 16 位烈士，保留农会旧址、赤卫队遗址等省定革命遗迹；2017 年后依托红色资源 + 特色美食转型，建成红色文化教育基地、玛仔体验项目，从贫困村升级为 “广东省文化和旅游特色村”“网红村”，经济以水稻、花生种植为主，兼营浅海渔业与水产养殖，同时保留 “尊师重教” 传统，辖区内有张静中学。",
+      "image": "https://village-1369475595.cos.ap-guangzhou.myqcloud.com/static/village/dongwei/dongwei.jpg"
+    },
+    {
+      "name": "排骨咸饭",
+      "slug": "paiguxianfan",
+      "latitude": 22.85,
+      "longitude": 115.8,
+      "intro": "始建于清康熙四十五年（1706 年），由黄氏先祖从潮州迁居兴建，因 “垒寨求安” 得名 “建宁寨”，是陆丰市不可移动文物保护单位。村落占地约 60 亩，寨墙以三合土 + 糯米夯筑，设 3 座寨门，民居以 “黄氏家祠源远堂” 为中心，形成 “三街六巷” 布局。历史上有 7 人获贡生功名，保留清代 “天褒节孝” 牌坊，1927 年周恩来率部曾在此休整，现存革命遗迹。",
+      "image": "https://village-1369475595.cos.ap-guangzhou.myqcloud.com/static/village/jianningzhai/jianningzhai.png"
+    },
+    {
+      "name": "清蒸晨洲蚝",
+      "slug": "chenzhouhao",
+      "latitude": 22.75,
+      "longitude": 115.25,
+      "intro": "古称 “神州岛”，因地处黄江、龙津河、大液河三江入海口，咸淡水交汇的滩涂孕育了优质生蚝，素有 “生蚝皇冠上的明珠” 美誉，是中国美丽休闲乡村、广东特色产业名村。2018 年后以 “公司 + 基地 + 股民” 模式发展蚝产业，同时建设蚝文化长廊、观鹭台等景观，形成 “赏湿地、品生蚝、体验蚝文化” 的文旅特色。",
+      "image": "https://village-1369475595.cos.ap-guangzhou.myqcloud.com/static/village/chenzhou/chenzhou.png"
+    }
+  ],
+  "foods": [
+    {
+      "name": "红桃粿",
+      "slug": "taohuaguo",
+      "village": "海丰县附城镇新山村",
+      "image": "https://village-1369475595.cos.ap-guangzhou.myqcloud.com/static/food/hongtaoguo.png",
+      "desc": "# 汕尾十大旅游手信 · # 传承百年 · # 纯手工制作",
+      "recipe": "因取桃果造型而得名，象征<text class=\"highlight\">长寿</text>；\"红\" 字源于其鲜艳的桃红色泽，寓意吉祥喜庆。在汕尾地区有多种叫法，如红壳桃粿、红曲桃、红粿、桃粿等。\n红桃粿<text class=\"highlight\">历史悠久</text>，可追溯至明清时期，源自南下潮汕的中原移民因地制宜，用稻米替代麦子制作的传统美食。\n是海陆丰地区 (含海丰县) 节庆祭祀的必备贡品，也是当地<text class=\"highlight\"> \"时年八节\" </text>家家户户必做的特色美食。"
+    },
+    {
+      "name": "石寨菜包粿",
+      "slug": "caibaoguo",
+      "village": "陆丰市大安镇石寨村",
+      "image": "https://village-1369475595.cos.ap-guangzhou.myqcloud.com/static/food/caibaoguo.png",
+      "desc": "# 古村烟火气 · # 传承百年 · # 纯手工制作",
+      "recipe": "是陆丰（含石寨村）的经典客家粿品，因外形像包裹的 <text class=\"highlight\">“菜包” </text> 得名，是石寨村春节、元宵等节庆的待客主食。\n古村人家常聚在祠堂前一起包制，馅料藏着 <text class=\"highlight\">“包罗万象、吉祥圆满” </text>的寓意，外皮软韧、内馅鲜香，是古村烟火气的代表。"
+    },
+    {
+      "name": "遮浪玛仔",
+      "slug": "shaqima",
+      "village": "红海湾遮浪街头东尾村",
+      "image": "https://village-1369475595.cos.ap-guangzhou.myqcloud.com/static/food/shaqima.png",
+      "desc": "# 汕尾十大旅游手信 · # 传承百年 · # 纯手工制作",
+      "recipe": "遮浪玛仔（普通话称“沙琪玛”）是东尾村传承逾百年的特色糕点。它源自庄氏先辈的传统工艺，入选<text class=\"highlight\">“汕尾十大旅游手信”</text>。\n如今在小麦粉、麦芽糖、花生仁的基础上，创新加入汕尾本地海产品（如海胆、海苔），推出<text class=\"highlight\">海胆味、海苔味</text>等特色口味。\n成品色泽米黄，口感<text class=\"highlight\">酥松绵软</text>，兼具香甜味与桂花蜂蜜香气，是东尾村的“网红伴手礼”。"
+    },
+    {
+      "name": "排骨咸饭",
+      "slug": "paiguxianfan",
+      "village": "陆丰市南塘镇建宁寨村",
+      "image": "https://village-1369475595.cos.ap-guangzhou.myqcloud.com/static/food/paiguxianfan.png",
+      "desc": "# 孝德文化 · # \"古早味\"",
+      "recipe": "因主要食材为排骨与咸香米饭而得名，\"咸饭\" 指<text class=\"highlight\">不加糖的米饭</text>，区别于甜饭。在闽南地区和粤东地区广泛流行，是当地居民喜爱的家常主食。\n排骨咸饭源于闽南饮食文化，随着闽南人南迁传入粤东地区。陆丰南塘地处闽南文化与潮汕文化交汇地带，这道美食融合了两地烹饪特色，成为当地饮食文化的重要组成部分。\n是南塘镇居民日常饮食和节庆宴席常见的主食，尤其适合秋冬季节食用，热气腾腾，<text class=\"highlight\">香气四溢</text>，能驱寒暖身，是当地 \"古早味\"(传统风味) 的代表之一。"
+    },
+    {
+      "name": "清蒸晨洲蚝",
+      "slug": "chenzhouhao",
+      "village": "城区红草镇晨洲村",
+      "image": "https://village-1369475595.cos.ap-guangzhou.myqcloud.com/static/food/chenzhouhao.png",
+      "desc": "# 蚝文化 · # “原汁原味的鲜气炸弹”",
+      "recipe": "晨洲蚝最经典的吃法，完全凸显其<text class=\"highlight\"> “零腥味、高鲜甜” </text>的特质。选用生长 3-5 年的成熟晨洲蚝，仅需简单清蒸，蚝肉便饱满滑嫩，咬下时鲜汁在舌尖迸发，搭配少许酱油或柠檬汁，堪称<text class=\"highlight\">“大海的原味馈赠”</text>。\n因晨洲蚝生长于洁净咸淡水，部分资深食客甚至会选择生吃，但<text class=\"highlight\">清蒸</text>更适合大众口味，也是欢喜蚝宅、小岛蚝情等网红餐厅的 “必点招牌”。"
+    }
+  ],
+  "shopGoods": [
+    {
+      "name": "手机壳·款一",
+      "image": "https://village-1369475595.cos.ap-guangzhou.myqcloud.com/static/shop/shoujike1.jpg",
+      "cost": 200,
+      "desc": "创意手机壳 (款式A)",
+      "stock": 200
+    },
+    {
+      "name": "特产沙琪玛",
+      "image": "https://village-1369475595.cos.ap-guangzhou.myqcloud.com/static/shop/shaqima.png",
+      "cost": 500,
+      "desc": "海胆味沙琪玛 1盒",
+      "stock": 100
+    },
+    {
+      "name": "古风扇子·款二",
+      "image": "https://village-1369475595.cos.ap-guangzhou.myqcloud.com/static/shop/shanzi2.jpg",
+      "cost": 320,
+      "desc": "国潮折扇 (款式B)",
+      "stock": 45
+    },
+    {
+      "name": "古风扇子·款一",
+      "image": "https://village-1369475595.cos.ap-guangzhou.myqcloud.com/static/shop/shanzi1.jpg",
+      "cost": 300,
+      "desc": "国潮折扇 (款式A)",
+      "stock": 50
+    },
+    {
+      "name": "明信片",
+      "image": "https://village-1369475595.cos.ap-guangzhou.myqcloud.com/static/shop/mingxinpian.jpg",
+      "cost": 150,
+      "desc": "精美风景明信片",
+      "stock": 999
+    },
+    {
+      "name": "趣味贴纸",
+      "image": "https://village-1369475595.cos.ap-guangzhou.myqcloud.com/static/shop/tiezhi.jpg",
+      "cost": 80,
+      "desc": "手账贴纸套装",
+      "stock": 500
+    },
+    {
+      "name": "手机壳·款二",
+      "image": "https://village-1369475595.cos.ap-guangzhou.myqcloud.com/static/shop/shoujike2.jpg",
+      "cost": 210,
+      "desc": "创意手机壳 (款式B)",
+      "stock": 180
+    }
+  ],
+  "quizQuestions": [
+    {
+      "title": "建宁寨村的寨墙是用什么材料筑成的？",
+      "options": [
+        "砖头",
+        "三合土 + 糯米",
+        "石头",
+        "木头"
+      ],
+      "answerIndex": 1,
+      "points": 10
+    },
+    {
+      "title": "红桃粿因造型如桃而得名，象征什么？",
+      "options": [
+        "多子多福",
+        "长寿",
+        "团圆",
+        "丰收"
+      ],
+      "answerIndex": 1,
+      "points": 10
+    },
+    {
+      "title": "建宁寨村始建于哪一年？",
+      "options": [
+        "1706年",
+        "1800年",
+        "1900年",
+        "1600年"
+      ],
+      "answerIndex": 0,
+      "points": 10
+    },
+    {
+      "title": "东尾村位于哪里？",
+      "options": [
+        "海丰县",
+        "陆丰市",
+        "城区红草镇",
+        "红海湾遮浪街道"
+      ],
+      "answerIndex": 3,
+      "points": 10
+    },
+    {
+      "title": "红桃粿的颜色寓意是什么？",
+      "options": [
+        "财富",
+        "长寿",
+        "吉祥喜庆",
+        "避邪"
+      ],
+      "answerIndex": 2,
+      "points": 10
+    },
+    {
+      "title": "制作红桃粿外皮的主要原料是？",
+      "options": [
+        "小麦粉",
+        "稻米 (粘米/糯米)",
+        "玉米粉",
+        "绿豆粉"
+      ],
+      "answerIndex": 1,
+      "points": 10
+    },
+    {
+      "title": "遮浪玛仔（沙琪玛）入选了什么名单？",
+      "options": [
+        "中国非物质文化遗产",
+        "汕尾十大旅游手信",
+        "广东名小吃",
+        "世界美食指南"
+      ],
+      "answerIndex": 1,
+      "points": 10
+    },
+    {
+      "title": "中国的首都是哪座城市？",
+      "options": [
+        "上海",
+        "北京",
+        "广州",
+        "深圳"
+      ],
+      "answerIndex": 1,
+      "points": 10
+    },
+    {
+      "title": "红桃粿的“红”字源于其鲜艳的色泽，寓意是什么？",
+      "options": [
+        "财富",
+        "长寿",
+        "吉祥喜庆",
+        "避邪"
+      ],
+      "answerIndex": 2,
+      "points": 10
+    },
+    {
+      "title": "排骨咸饭中的“咸饭”是指？",
+      "options": [
+        "加了很多盐的饭",
+        "不加糖的米饭",
+        "加了咸菜的饭",
+        "用海水煮的饭"
+      ],
+      "answerIndex": 1,
+      "points": 10
+    },
+    {
+      "title": "东尾村保留了哪种传统？",
+      "options": [
+        "尊师重教",
+        "重农抑商",
+        "出海捕鲸",
+        "制作陶瓷"
+      ],
+      "answerIndex": 0,
+      "points": 10
+    },
+    {
+      "title": "石寨村因何得名？",
+      "options": [
+        "因为这里盛产石油",
+        "因为村寨用石头筑成",
+        "因为村民都姓石",
+        "因为有一块巨大的风水石"
+      ],
+      "answerIndex": 1,
+      "points": 10
+    },
+    {
+      "title": "晨洲村素有什么美誉？",
+      "options": [
+        "鱼米之乡",
+        "生蚝皇冠上的明珠",
+        "水果之乡",
+        "长寿之乡"
+      ],
+      "answerIndex": 1,
+      "points": 10
+    },
+    {
+      "title": "地球上最大的洋是？",
+      "options": [
+        "大西洋",
+        "太平洋",
+        "印度洋",
+        "北冰洋"
+      ],
+      "answerIndex": 1,
+      "points": 10
+    },
+    {
+      "title": "新山村涌现了多少位烈士？",
+      "options": [
+        "一门七英烈",
+        "五位",
+        "十位",
+        "无"
+      ],
+      "answerIndex": 0,
+      "points": 10
+    },
+    {
+      "title": "新山村位于海丰县的哪个镇？",
+      "options": [
+        "附城镇",
+        "梅陇镇",
+        "公平镇",
+        "赤坑镇"
+      ],
+      "answerIndex": 0,
+      "points": 10
+    },
+    {
+      "title": "石寨村始建于哪个朝代？",
+      "options": [
+        "唐武德年间",
+        "宋代",
+        "明代",
+        "清代"
+      ],
+      "answerIndex": 0,
+      "points": 10
+    },
+    {
+      "title": "晨洲蚝最经典的吃法是？",
+      "options": [
+        "炭烤",
+        "清蒸",
+        "油炸",
+        "生吃"
+      ],
+      "answerIndex": 1,
+      "points": 10
+    },
+    {
+      "title": "石寨菜包粿是哪个节庆的待客主食？",
+      "options": [
+        "中秋节",
+        "端午节",
+        "春节、元宵",
+        "清明节"
+      ],
+      "answerIndex": 2,
+      "points": 10
+    },
+    {
+      "title": "晨洲村位于哪三江的入海口？",
+      "options": [
+        "长江、黄河、珠江",
+        "黄江、龙津河、大液河",
+        "韩江、榕江、练江",
+        "东江、西江、北江"
+      ],
+      "answerIndex": 1,
+      "points": 10
+    }
+  ]
+}

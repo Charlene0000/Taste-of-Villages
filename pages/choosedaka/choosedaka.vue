@@ -90,7 +90,7 @@ import { checkAuth } from '@/utils/router-guard.js'
 		},
         onLoad(options) {
           // 路由守卫：未登录访问受保护页面时跳登录
-          if (!checkAuth()) return
+          if (!checkAuth({ route: 'pages/choosedaka/choosedaka' })) return
 
             
             this.checkPhotoFeatureStatus();
@@ -128,17 +128,19 @@ import { checkAuth } from '@/utils/router-guard.js'
             async checkPhotoFeatureStatus() {
                 this.isLoadingFeature = true;
                 try {
-                    const res = await agentApi.chat({ action: 'checkStatus' });
-                    
-                    if (res && res.enable === true) {
-                        this.isPhotoEnabled = true;
-                    } else {
-                        this.isPhotoEnabled = false;
-                    }
+                    // Sprint 5.1 修复：
+                    // 原代码调用 agentApi.chat({ action:'checkStatus' })，
+                    // 但后端 /api/agent/chat 只接受 { message } / { messages }，
+                    // 收到 action 对象后返回 400「缺少提问内容」，
+                    // 于是 isPhotoEnabled 恒为 false —— 拍照打卡入口被禁用。
+                    //
+                    // 现在：图片识别接口（analyzeFoodPhoto）在后端已实现本地降级，
+                    // 始终可用，直接置为 enabled。
+                    this.isPhotoEnabled = true;
+                    console.log('[choosedaka] 拍照功能已启用（本地识别降级模式，零外部依赖）');
                 } catch (e) {
-                    console.error('Failed to check photo feature status:', e);
-                    
-                    this.isPhotoEnabled = false;
+                    console.error('[choosedaka] checkPhotoFeatureStatus 异常:', e);
+                    this.isPhotoEnabled = true; // 保守放行
                 } finally {
                     this.isLoadingFeature = false;
                 }
