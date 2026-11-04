@@ -1,0 +1,8 @@
+{
+  "name": "app-config",
+  "version": "1.0.0",
+  "description": "项目级统一配置读取层：屏蔽第三方服务密钥，集中管理并提供本地降级判定",
+  "main": "index.js",
+  "license": "MIT",
+  "author": "CharLene"
+}

@@ -1,0 +1,100 @@
+{
+  "_readme": [
+    "=====================================================================",
+    " 跨境共生小程序 — 外部服务配置示例",
+    "=====================================================================",
+    "本文件是【配置说明书】，不是生效配置。",
+    "",
+    "仓库 clone 后不做任何额外配置，默认路径即可完整跑通，且不产生任何外部 API 费用。",
+    "所有收费服务均为【可选适配器】，默认关闭。",
+    "",
+    "启用方式（二选一）：",
+    "  A. 生产环境（推荐）：在 HBuilderX 中右键 uniCloud 空间 →",
+    "     「uni-config-center / app-config / config.json」中填写，",
+    "     该文件仅存在于云端控制台，不进入 Git 版本库。",
+    "  B. 本地开发：复制本文件为 common/app-config/config.local.json 并填写，",
+    "     该文件已被 .gitignore 排除，不进入 Git 版本库。",
+    "",
+    "判定逻辑见 common/app-config/index.js 的 isServiceEnabled()：",
+    "  仅当 _enabled === true 且必填字段已从占位符替换为真实值时，服务才会被启用。",
+    "  未启用的服务，调用方一律走本地降级路径（零外部调用、零费用）。",
+    "====================================================================="
+  ],
+
+  "deepseek": {
+    "_enabled": false,
+    "_name": "DeepSeek LLM（AI 问答增强）",
+    "_getKey": "https://platform.deepseek.com/api_keys",
+    "_cost": "按 token 计费，充值制",
+    "_defaultPath": "关闭时走本地 knowledge.json 检索 + 规则回答（零依赖、零费用）",
+    "_usedBy": "uniCloud-aliyun/cloudfunctions/ai-agent/index.js (action=chat)",
+    "apiKey": "your-deepseek-key-placeholder",
+    "apiUrl": "https://api.deepseek.com/v1/chat/completions",
+    "model": "deepseek-chat"
+  },
+
+  "xfyun": {
+    "_enabled": false,
+    "_name": "讯飞开放平台 TTS（语音播报）",
+    "_getKey": "https://www.xfyun.cn/console/tts/voicelist",
+    "_cost": "语音合成按字符计费，有免费额度",
+    "_defaultPath": "关闭时仅做口型动画 + 打字机效果，不发声",
+    "_usedBy": "uniCloud-aliyun/cloudfunctions/ai-agent/index.js (action=tts)",
+    "appId": "your-xfyun-appid-placeholder",
+    "apiSecret": "your-xfyun-api-secret-placeholder",
+    "apiKey": "your-xfyun-api-key-placeholder"
+  },
+
+  "baidu": {
+    "_enabled": false,
+    "_name": "百度智能云 菜品识别（拍照识图）",
+    "_getKey": "https://cloud.baidu.com/product/ai/ocr",
+    "_cost": "按调用次数计费，有免费额度",
+    "_defaultPath": "关闭时由用户手动输入食材名，走本地规则匹配",
+    "_usedBy": "uniCloud-aliyun/cloudfunctions/analyzeFoodPhoto/index.js",
+    "apiKey": "your-baidu-api-key-placeholder",
+    "secretKey": "your-baidu-secret-key-placeholder"
+  },
+
+  "cos": {
+    "_enabled": false,
+    "_name": "腾讯云 COS 对象存储（图片上传）",
+    "_getKey": "https://console.cloud.tencent.com/cos",
+    "_cost": "按存储量与流量计费，有免费额度",
+    "_defaultPath": "关闭时改用 uniCloud 云存储（免费额度内），或由用户手动选择本地图片",
+    "_usedBy": "uniCloud-aliyun/cloudfunctions/getCosAuth/index.js",
+    "bucket": "your-cos-bucket-placeholder",
+    "region": "ap-guangzhou",
+    "secretId": "your-cos-secret-id-placeholder",
+    "secretKey": "your-cos-secret-key-placeholder"
+  },
+
+  "uniId": {
+    "_name": "uni-id 账户体系配置（必填，非外部收费服务）",
+    "_location": "uni_modules/uni-config-center/uniCloud/cloudfunctions/common/uni-config-center/uni-id/config.json",
+    "_note": "该文件已在仓库中改为占位符。部署前必须替换以下两项，否则 JWT 可被伪造。",
+    "tokenSecret": "your-token-secret-placeholder",
+    "requestAuthSecret": "your-request-auth-secret-placeholder",
+    "_required": [
+      "tokenSecret —— JWT 签名密钥，示例值 'tokenSecret-demo' 必须替换，否则任何人都能伪造登录 token",
+      "requestAuthSecret —— 请求签名密钥，同样必须替换"
+    ],
+    "_optional": {
+      "service.sms.smsKey / smsSecret": "阿里云短信服务密钥。不配置时 uni-id 进入测试模式，验证码固定为 123456（仅限开发环境）",
+      "service.sms.scene.*.templateId": "各场景短信模板 ID。不配置时同样走 123456 测试模式",
+      "mp-weixin.oauth.weixin.appid / appsecret": "微信小程序登录。不配置时仅 smsCode 登录可用",
+      "app.oauth.weixin.appid / appsecret": "App 端微信登录",
+      "service.univerify.appid / apiKey / apiSecret": "一键登录（uni-verify）",
+      "mp-alipay.oauth.alipay.appid / privateKey": "支付宝小程序登录"
+    }
+  },
+
+  "manifest": {
+    "_name": "应用配置（manifest.json）中需要按环境替换的字段",
+    "_location": "manifest.json",
+    "appid": "DCloud 应用标识，绑定你的开发者账号",
+    "mp-weixin.appid": "微信小程序 AppID（公开标识，非密钥，但需换成自己的）",
+    "_spaceID": "uniCloud 服务空间 ID（阿里云空间绑定信息，非密钥）",
+    "app-plus.sdkConfigs.oauth.weixin.appid": "App 端微信登录 AppID"
+  }
+}

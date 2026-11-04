@@ -1,0 +1,9 @@
+{
+    "name": "saveUserPhotos",
+    "dependencies": {},
+    "extensions": {
+        "uni-cloud-jql": {}
+    },
+    "author": "CharLene",
+    "license": "MIT"
+}

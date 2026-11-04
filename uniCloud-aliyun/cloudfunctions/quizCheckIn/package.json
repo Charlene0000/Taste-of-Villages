@@ -1,0 +1,12 @@
+{
+    "name": "quizCheckIn",
+    "version": "1.0.0",
+    "description": "quizCheckIn 云函数",
+    "main": "index.js",
+    "author": "CharLene",
+    "license": "MIT",
+    "dependencies": {},
+    "extensions": {
+        "uni-cloud-jql": {}
+    }
+}

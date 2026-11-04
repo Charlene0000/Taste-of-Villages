@@ -1,0 +1,47 @@
+# 依赖与构建产物
+node_modules/
+unpackage/
+dist/
+build/
+
+# npm 缓存（云函数内）
+.npm-cache/
+npm_cache/
+.npm/
+*.tgz
+
+# HBuilderX 本地配置（含个人云空间绑定信息，不入库）
+.hbuilderx/launch.json
+
+# 环境变量与本地密钥（严禁入库）
+.env
+.env.*
+!.env.example
+config.local.json
+**/config.local.json
+*.local.json
+
+# 日志与临时文件
+*.log
+npm-debug.log*
+yarn-error.log*
+logs/
+tmp/
+temp/
+
+# 编辑器 / IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# 操作系统
+.DS_Store
+Thumbs.db
+ehthumbs.db
+desktop.ini
+
+# 本地备份（历史版本备份目录，不应进入版本库）
+.backup/
+**/.backup/

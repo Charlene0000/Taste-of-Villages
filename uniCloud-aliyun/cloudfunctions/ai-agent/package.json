@@ -1,0 +1,15 @@
+{
+    "name": "ai-agent",
+    "version": "1.0.0",
+    "description": "Unified AI Agent for Chat and TTS",
+    "main": "index.js",
+    "dependencies": {
+        "crypto-js": "^4.2.0",
+        "ws": "^8.13.0"
+    },
+    "extensions": {
+        "uni-cloud-jql": {}
+    },
+    "author": "CharLene",
+    "license": "MIT"
+}

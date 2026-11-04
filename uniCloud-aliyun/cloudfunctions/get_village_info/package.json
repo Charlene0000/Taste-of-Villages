@@ -1,0 +1,9 @@
+{
+    "name": "get_village_info",
+    "dependencies": {},
+    "extensions": {
+        "uni-cloud-jql": {}
+    },
+    "author": "CharLene",
+    "license": "MIT"
+}

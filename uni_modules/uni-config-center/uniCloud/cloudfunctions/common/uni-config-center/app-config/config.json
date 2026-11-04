@@ -1,0 +1,31 @@
+{
+  "_comment": "第三方服务配置占位符。真实值请在 uni-config-center 中配置，或本地复制为 config.local.json（已在 .gitignore 中排除）。未配置的服务一律走本地降级路径，不产生任何外部调用与费用。",
+  "deepseek": {
+    "_enabled": false,
+    "_doc": "https://platform.deepseek.com/api_keys",
+    "apiKey": "your-deepseek-key-placeholder",
+    "apiUrl": "https://api.deepseek.com/v1/chat/completions",
+    "model": "deepseek-chat"
+  },
+  "xfyun": {
+    "_enabled": false,
+    "_doc": "https://www.xfyun.cn/console/tts/voicelist",
+    "appId": "your-xfyun-appid-placeholder",
+    "apiSecret": "your-xfyun-api-secret-placeholder",
+    "apiKey": "your-xfyun-api-key-placeholder"
+  },
+  "baidu": {
+    "_enabled": false,
+    "_doc": "https://cloud.baidu.com/product/ai/ocr",
+    "apiKey": "your-baidu-api-key-placeholder",
+    "secretKey": "your-baidu-secret-key-placeholder"
+  },
+  "cos": {
+    "_enabled": false,
+    "_doc": "https://console.cloud.tencent.com/cos",
+    "bucket": "your-cos-bucket-placeholder",
+    "region": "ap-guangzhou",
+    "secretId": "your-cos-secret-id-placeholder",
+    "secretKey": "your-cos-secret-key-placeholder"
+  }
+}
