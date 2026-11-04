@@ -1,0 +1,117 @@
+name: Build APK
+
+# 触发条件：推送形如 v1.0.0 的 tag 时自动构建
+on:
+  push:
+    tags:
+      - 'v*'
+  # 手动触发（便于在打 tag 前先验证流水线是否可用）
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '构建版本号（留空则使用 tag / branch 版本）'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 读取 Node 版本
+        id: node
+        run: echo "version=$(cat .nvmrc 2>/dev/null || echo '18')" >> $GITHUB_OUTPUT
+
+      - name: 安装 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ steps.node.outputs.version }}
+          cache: npm
+
+      - name: 安装依赖
+        run: npm ci || npm install
+
+      - name: 运行 JSON 与单元测试
+        run: |
+          npm test
+          npm run test:auth
+          npm run test:session
+          npm run test:agent
+          npm run test:avatar
+
+      - name: 确认敏感信息未进入版本库
+        run: |
+          echo "检查源码中是否残留硬编码密钥..."
+          if grep -rnE "sk-[a-zA-Z0-9]{20,}|AKID[a-zA-Z0-9]{20,}" \
+             --include="*.js" --include="*.json" --include="*.vue" . ; then
+            echo "::error::检测到疑似硬编码密钥，构建中止"
+            exit 1
+          fi
+          echo "密钥扫描通过"
+
+      # ------------------------------------------------------------------
+      # 以下步骤需要 HBuilderX CLI 或云打包服务授权。
+      # 默认情况下本 job 不会真正产出 APK —— 详见 README 的 Build APK 章节。
+      #
+      # 方案 A（推荐）：使用云打包服务
+      #   在仓库 Secrets 中配置：
+      #     HBUILDERX_USERNAME  DCloud 账号
+      #     HBUILDERX_PASSWORD  DCloud 密码
+      #     HBUILDERX_API_KEY  云打包 API Key
+      #   然后放开下面的「云打包」步骤。
+      #
+      # 方案 B：自建 runner
+      #   在自备的 runner 上预装 HBuilderX CLI，
+      #   通过 `cli publish` 命令行完成打包。
+      # ------------------------------------------------------------------
+      - name: 构建 APK（需要配置打包凭据）
+        id: build
+        continue-on-error: true
+        env:
+          HBUILDERX_USERNAME: ${{ secrets.HBUILDERX_USERNAME }}
+          HBUILDERX_PASSWORD: ${{ secrets.HBUILDERX_PASSWORD }}
+          HBUILDERX_API_KEY: ${{ secrets.HBUILDERX_API_KEY }}
+        run: |
+          if [ -z "$HBUILDERX_API_KEY" ]; then
+            echo "::warning::未配置 HBUILDERX_API_KEY，跳过实际打包（这是默认状态）"
+            echo "构建说明: 请在仓库 Secrets 中配置打包凭据后重跑，详见 README「Build APK」章节"
+            exit 0
+          fi
+
+          echo "开始云打包..."
+          # 云打包需要调用 DCloud 打包服务，此处为占位实现。
+          # 实际接入时替换为你的打包脚本，例如：
+          #   npx @dcloudio/uni-app-plus-cli publish ...
+          # 或调用自建 runner 上的 HBuilderX CLI：
+          #   /opt/HBuilderX/cli publish --platform APP --project . -p android
+          echo "请在此接入你的实际打包命令"
+          exit 0
+
+      - name: 上传构建产物
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-apk-${{ github.run_number }}
+          path: |
+            dist/
+            unpackage/manifest.json
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: 上传校验报告
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-report-${{ github.run_number }}
+          path: |
+            test-report/
+          if-no-files-found: ignore
+          retention-days: 7
