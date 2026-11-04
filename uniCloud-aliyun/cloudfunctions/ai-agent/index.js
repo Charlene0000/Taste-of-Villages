@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 
 
-const IS_AI_ENABLED = true;
+const IS_AI_ENABLED = true; 
 
 
 // =================配置区（密钥统一由 app-config 提供，源码不含真实凭据）=================
@@ -32,7 +32,22 @@ const DEEPSEEK_API_URL = (CONFIG.deepseek && CONFIG.deepseek.apiUrl) || 'https:/
 const XFYUN_APPID = (CONFIG.xfyun && CONFIG.xfyun.appId) || 'your-xfyun-appid-placeholder';
 const XFYUN_API_SECRET = (CONFIG.xfyun && CONFIG.xfyun.apiSecret) || 'your-xfyun-api-secret-placeholder';
 const XFYUN_API_KEY = (CONFIG.xfyun && CONFIG.xfyun.apiKey) || 'your-xfyun-api-key-placeholder';
+
 // =======================================
+//
+// ── 能力开关 ──────────────────────────────────────────────
+// 本云函数在 Sprint 2 后被收窄为「云端能力提供者」，不再承担编排职责。
+// 编排（意图识别 → 工具调度 → 降级）由前端 agent/core 负责。
+//
+//   action=knowledge  本地 knowledge.json 检索    → 零外部依赖、零费用（默认可用）
+//   action=chat      DeepSeek LLM 推理            → 收费，默认关闭
+//   action=tts       讯飞语音合成                  → 收费，默认关闭
+//   action=clear     清除聊天记录                  → 本地数据库
+//
+// isServiceEnabled 同时校验 _enabled 标志与字段是否已脱离占位符形态，
+// 任一不满足即视为未启用，调用方走本地降级路径。
+const isDeepseekEnabled = appConfig.isServiceEnabled('deepseek')
+const isXfyunEnabled = appConfig.isServiceEnabled('xfyun')
 
 
 
@@ -68,30 +83,38 @@ function searchKnowledge(question, knowledgeBase) {
   if (!lowerQuestion) return '';
   
   let bestMatch = '';
-  let maxMatchScore = 0;
+  // 修复：原实现用 Infinity 当「精确匹配」哨兵，导致后续关键词加权的
+  // `matchCount > maxMatchScore` 在 Infinity 面前永远为 false，
+  // 关键词加权路径实质失效。这里改用独立的命中级别标记。
+  let bestLevel = 0;   // 0=无命中 1=关键词命中 2=包含匹配 3=精确匹配
+  let bestScore = 0;   // 关键词命中数
 
   knowledgeBase.forEach(item => {
     if (!item.question || !item.answer) return;
     
-    
     const questionVariants = item.question.split('||').map(q => q.toLowerCase().trim());
     
     questionVariants.forEach(variant => {
+      if (!variant) return;
       
+      // 精确匹配 —— 最高优先级，直接选定
       if (lowerQuestion === variant) {
         bestMatch = item.answer;
-        maxMatchScore = Infinity;
+        bestLevel = 3;
+        bestScore = 0;
         return;
       }
       
-      
+      // 包含匹配
       if (lowerQuestion.includes(variant) || variant.includes(lowerQuestion)) {
-        bestMatch = item.answer;
-        maxMatchScore = Infinity;
+        if (bestLevel < 3) {
+          bestMatch = item.answer;
+          bestLevel = 2;
+        }
         return;
       }
       
-      
+      // 关键词加权命中
       const questionKeywords = [...new Set(lowerQuestion.split(/\s+|，|。|？|！|、|：|；/))].filter(k => k.length > 0);
       const kbKeywords = [...new Set(variant.split(/\s+|，|。|？|！|、|：|；/))].filter(k => k.length > 0);
       
@@ -104,8 +127,10 @@ function searchKnowledge(question, knowledgeBase) {
         }
       });
       
-      if (matchCount > 0 && matchCount > maxMatchScore) {
-        maxMatchScore = matchCount;
+      // 关键词命中只在没有更高优先级命中时生效
+      if (matchCount > 0 && bestLevel < 2 && matchCount > bestScore) {
+        bestScore = matchCount;
+        bestLevel = 1;
         bestMatch = item.answer;
       }
     });
@@ -183,6 +208,20 @@ async function handleTTS(data) {
   
   if (XFYUN_APPID === 'YOUR_APPID' || !XFYUN_APPID) {
     return { code: 500, message: '请配置有效的讯飞APPID' };
+  }
+
+  // 讯飞未启用时降级：不发起外部调用，返回 audio: null 与文本，
+  // 由前端决定是否用可选 TTS 适配器播报。保证零配置可跑、零费用。
+  if (!isXfyunEnabled) {
+    console.log('[ai-agent] 讯飞 TTS 未启用，返回降级结果（audio=null）');
+    return {
+      code: 200,
+      audio: null,
+      text: text.trim(),
+      degraded: true,
+      source: 'tts-fallback',
+      message: 'TTS 未启用，已降级为纯文本（前端可改用本地口型动画）'
+    };
   }
 
   const wssUrl = getXfyunWssUrl();
@@ -327,7 +366,7 @@ async function handleChat(uid, data) {
       }
     }
 
-    return { code: 200, result: directResult, message: '命中知识库并直出' };
+    return { code: 200, result: directResult, message: '命中知识库并直出', source: 'knowledge-base' };
   }
 
   
@@ -336,13 +375,45 @@ async function handleChat(uid, data) {
   baseSystemContent = baseSystemContent.trim();
 
   
+  // LLM 未配置时降级：不再硬调 DeepSeek，而是明确告知前端走本地规则路径。
+  // 这保证默认路径零外部调用、零费用，且行为可预期。
+  if (!isDeepseekEnabled) {
+    console.log('[ai-agent] DeepSeek 未启用，返回降级状态（前端将走本地规则回答）');
+    return {
+      code: 200,
+      source: 'fallback',
+      degraded: true,
+      message: 'LLM 未启用，已降级为本地知识库检索',
+      result: {
+        id: `fallback_${Date.now()}`,
+        object: 'chat.completion',
+        created: Math.floor(Date.now() / 1000),
+        model: 'knowledge-base-fallback',
+        choices: [
+          {
+            index: 0,
+            message: {
+              role: 'assistant',
+              content: '这个问题我暂时没有查到对应的知识。你可以在「Agent 演示」页体验完整的工具编排能力。'
+            },
+            finish_reason: 'stop'
+          }
+        ]
+      }
+    };
+  }
+
+  
+  // 多轮上下文：保留此前的对话历史，而非只取最后一条用户消息
+  const history = currentMessages.filter(m => m.role === 'user' || m.role === 'assistant');
   const fullContext = [
     { role: 'system', content: baseSystemContent },
-    userMessage
+    ...history.slice(-10)
   ];
 
   console.log('最终发送的指令:', baseSystemContent || '无额外系统指令');
   console.log('用户问题:', userQuestion);
+  console.log('上下文轮数:', fullContext.length);
 
   
   const res = await callDeepSeek(fullContext);

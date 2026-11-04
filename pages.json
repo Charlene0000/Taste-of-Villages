@@ -309,6 +309,12 @@
 				"navigationBarTitleText": "共生勋章",
 				"navigationStyle": "custom"
 			}
+		},
+		{
+			"path": "pages/agent-demo/agent-demo",
+			"style": {
+				"navigationBarTitleText": "Agent 演示"
+			}
 		}
 	],
 	"easycom": {
