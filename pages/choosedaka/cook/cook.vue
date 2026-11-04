@@ -323,6 +323,9 @@
 </template>
 
 <script>
+import { businessApi } from '@/utils/auth.js'
+import { checkAuth } from '@/utils/router-guard.js'
+
 
 
 import ProgressBar from '@/components/ProgressBar.vue'
@@ -400,13 +403,16 @@ export default {
         }
     },
     onLoad(options) {
+      // 路由守卫：未登录访问受保护页面时跳登录
+      if (!checkAuth()) return
+
         if (options && options.slug) {
             this.slug = options.slug
             console.log('Cooking Game Slug:', this.slug)
         }
         
         try {
-            const storedUser = uni.getStorageSync('uni-id-pages-userInfo')
+            const storedUser = uni.getStorageSync('app_user_info')
             if(storedUser) {
                 this.userInfo = storedUser
             }
@@ -605,20 +611,17 @@ export default {
             let openid = this.userInfo ? this.userInfo._id : ''
             if (!openid) {
                 try {
-                    const s = uni.getStorageSync('uni-id-pages-userInfo')
+                    const s = uni.getStorageSync('app_user_info')
                     if(s) openid = s._id
                 } catch(e){}
             }
 
             try {
-                const { result } = await uniCloud.callFunction({
-                    name: 'gameCheckIn',
-                    data: {
+                const result = await businessApi.gameCheckIn({
                         gameId: 'cook-shaqima',
                         score: 25,
                         openid: openid
-                    }
-                })
+                    })
                 
                 if (result.code === 200) {
                     const msg = result.data.pointsAdded > 0 

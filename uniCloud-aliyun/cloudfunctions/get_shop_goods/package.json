@@ -1,9 +1,0 @@
-{
-    "name": "get_shop_goods",
-    "dependencies": {},
-    "extensions": {
-        "uni-cloud-jql": {}
-    },
-    "author": "CharLene",
-    "license": "MIT"
-}

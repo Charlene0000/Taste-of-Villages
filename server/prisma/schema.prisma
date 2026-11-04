@@ -1,0 +1,184 @@
+// Prisma schema —— 跨境共生小程序后端
+// 数据库：SQLite（本地文件，零配置零成本）
+//
+// 生成客户端：npx prisma generate
+// 同步到数据库：npx prisma db push
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+/// 用户表
+model User {
+  id           Int       @id @default(autoincrement())
+  /// 手机号（登录主键）
+  mobile       String    @unique
+  /// 昵称
+  nickname     String?
+  /// 头像 URL
+  avatar       String?
+  /// 密码哈希（bcrypt），手机号验证码登录的账号为 null
+  password     String?
+  /// 邮箱
+  email        String?
+  /// 累计登录次数
+  loginCount   Int       @default(0)
+  /// 最近登录时间
+  lastLoginAt  DateTime?
+  /// 最近登录 IP
+  lastLoginIp  String?
+  /// 注册时间
+  registerDate DateTime  @default(now())
+  /// 注册来源（sms / weixin / demo-seed）
+  source       String    @default("sms")
+  /// 积分
+  points       Int       @default(0)
+  /// 评分
+  score        Int       @default(0)
+  /// 签到日期（YYYY-MM-DD）
+  signinDate   String?
+  /// 连续签到天数
+  signinDays   Int       @default(0)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@map("users")
+}
+
+/// 验证码表
+model VerifyCode {
+  id          Int       @id @default(autoincrement())
+  /// 手机号
+  mobile      String
+  /// 场景（login / register / bind ...）
+  scene       String    @default("login")
+  /// 6 位验证码（CSPRNG 生成）
+  code        String
+  /// 已错误次数，达到 maxAttempts 即作废
+  attempts    Int       @default(0)
+  /// 最大允许错误次数
+  maxAttempts Int       @default(5)
+  /// 过期时间
+  expireAt    DateTime
+  /// 是否已使用
+  used        Boolean   @default(false)
+  /// 上次发送时间（频控判定）
+  lastSendAt  DateTime?
+  /// 当日已发送次数
+  dayCount    Int       @default(0)
+  /// 日期分桶键（YYYY-MM-DD），用于跨日重置
+  day         String?
+  /// 请求 IP
+  ip          String?
+  createdAt   DateTime  @default(now())
+
+  @@index([mobile, scene])
+  @@index([expireAt])
+  @@map("verify_codes")
+}
+
+/// 业务数据：打卡地点记录
+model CheckInPlace {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  locationId String
+  address    String?
+  type       String   @default("photo")
+  createTime DateTime @default(now())
+
+  @@index([userId])
+  @@map("check_in_places")
+}
+
+/// 业务数据：用户照片
+model UserPhoto {
+  id           Int      @id @default(autoincrement())
+  userId       Int
+  url          String
+  images       String?
+  locationName String?
+  title        String?
+  createTime   DateTime @default(now())
+
+  @@index([userId])
+  @@map("user_photos")
+}
+
+/// 业务数据：商城订单
+model UserOrder {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  itemId    String
+  itemName  String
+  itemImage String?
+  cost      Int      @default(0)
+  status    Int      @default(1)
+  createTime DateTime @default(now())
+
+  @@index([userId])
+  @@map("user_orders")
+}
+
+/// 业务数据：商城商品
+model ShopGood {
+  id       Int     @id @default(autoincrement())
+  name     String
+  image    String?
+  cost     Int     @default(0)
+  desc     String?
+  stock    Int     @default(999)
+
+  @@map("shop_goods")
+}
+
+/// 业务数据：答题题库
+model QuizQuestion {
+  id      Int    @id @default(autoincrement())
+  question String
+  options String
+  answer  Int
+  points  Int    @default(10)
+
+  @@map("quiz_questions")
+}
+
+/// 业务数据：聊天记录（每用户保留最近一条，与原 uniCloud 实现一致）
+model ChatHistory {
+  id           Int      @id @default(autoincrement())
+  userId       Int      @unique
+  lastQuestion String?
+  lastAnswer   String?
+  updatedAt    DateTime @updatedAt
+
+  @@map("chat_history")
+}
+
+/// 业务数据：村庄信息
+model Village {
+  id        Int     @id @default(autoincrement())
+  name      String
+  slug      String  @unique
+  latitude  Float?
+  longitude Float?
+  intro     String?
+  image     String?
+
+  @@map("villages")
+}
+
+/// 业务数据：美食信息
+model Food {
+  id      Int     @id @default(autoincrement())
+  name    String
+  village String?
+  image   String?
+  desc    String?
+  recipe  String?
+
+  @@map("foods")
+}

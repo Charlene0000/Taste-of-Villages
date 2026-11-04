@@ -66,9 +66,10 @@
 </template>
 
 <script>
+import { businessApi } from '@/utils/auth.js'
 import CustomTabBar from '@/components/custom-tab-bar/index.vue'
 
-import { store } from '@/uni_modules/uni-id-pages/common/store.js'
+import { getUserInfo } from '@/utils/request.js'
 
 export default {
 	components: {
@@ -93,19 +94,16 @@ export default {
 			uni.navigateBack()
 		},
 		async fetchData() {
-			const openid = this.userInfo._id || uni.getStorageSync('uni-id-pages-userInfo')._id;
+			const openid = this.userInfo._id || uni.getStorageSync('app_user_info')._id;
 			if (!openid) return;
 			
 			try {
 				this.loading = true;
-				const res = await uniCloud.callFunction({
-					name: 'getCheckInRecords',
-					data: { openid }
-				});
+				const res = await businessApi.getCheckInRecords({ openid });
 				
-				if (res.result && res.result.code === 200) {
+				if (res && res.code === 200) {
 					// 过滤出有进度的记录
-					const records = res.result.data.filter(item => item.progress > 0);
+					const records = res.data.filter(item => item.progress > 0);
 					
 					this.journalEntries = records.map((item, index) => {
 						const comments = [

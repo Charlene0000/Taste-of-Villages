@@ -6,11 +6,13 @@
     "main": "main.js",
     "scripts": {
         "test": "node scripts/check-json.js",
-        "test:auth": "node scripts/verify-auth-gateway.js",
-        "test:session": "node scripts/verify-session-audit.js",
         "test:agent": "node agent/tests/run-tests.js",
         "test:avatar": "node digital-avatar/tests/run-tests.js",
-        "test:all": "node scripts/check-json.js && node scripts/verify-auth-gateway.js && node scripts/verify-session-audit.js && node agent/tests/run-tests.js && node digital-avatar/tests/run-tests.js"
+        "test:api": "node server/tests/api.test.js",
+        "test:all": "node scripts/check-json.js && node agent/tests/run-tests.js && node digital-avatar/tests/run-tests.js",
+        "server:dev": "cd server && npm run dev",
+        "server:test": "cd server && npm run test:api",
+        "db:push": "cd server && npx prisma db push"
     },
     "keywords": [
         "uni-app",
@@ -42,10 +44,6 @@
     },
     "uni_modules": {
         "platforms": {
-            "cloud": {
-                "tcb": "y",
-                "aliyun": "y"
-            },
             "client": {
                 "App": {
                     "app-vue": "y",

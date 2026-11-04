@@ -14,26 +14,28 @@
  *
  *   const tts = {
  *     speak(text, { onStart, onEnd }) {
- *       uniCloud.callFunction({
- *         name: 'ai-agent',
- *         data: { action: 'tts', data: { params: { text } } }
- *       }).then(res => {
- *         if (res.result && res.result.audio) {
- *           const ctx = uni.createInnerAudioContext()
- *           ctx.src = 'data:audio/mp3;base64,' + res.result.audio
- *           ctx.onPlay(onStart)
- *           ctx.onEnded(onEnd)
- *           ctx.play()
- *           this._ctx = ctx
- *         } else {
- *           onEnd()   // 云端降级返回 audio: null
+ *       uni.request({
+ *         url: 'http://localhost:3000/api/tts',
+ *         method: 'POST',
+ *         data: { text },
+ *         header: { 'Content-Type': 'application/json' },
+ *         success(res) {
+ *           if (res.data && res.data.audio) {
+ *             const ctx = uni.createInnerAudioContext()
+ *             ctx.src = 'data:audio/mp3;base64,' + res.data.audio
+ *             ctx.onPlay(onStart)
+ *             ctx.onEnded(onEnd)
+ *             ctx.play()
+ *           } else {
+ *             onEnd()   // 服务端降级返回 audio: null
+ *           }
  *         }
  *       })
  *     },
  *     stop() { if (this._ctx) { this._ctx.stop(); this._ctx.destroy(); this._ctx = null } }
  *   }
  *
- * 注意：ai-agent 云函数的 tts action 在讯飞未配置时返回 { audio: null }，
+ * 注意：服务端未配置讯飞时返回 { audio: null }，
  *       此时不发出声音，仅口型动画继续 —— 这正是设计好的降级路径。
  */
 
@@ -78,42 +80,41 @@ function createUniAudioAdapter (options = {}) {
 		name: 'uni-audio',
 
 		speak (text, handlers = {}) {
-			const self = this
 			if (!text || !text.trim()) {
 				if (typeof handlers.onEnd === 'function') handlers.onEnd()
 				return
 			}
 
-			uniCloud.callFunction({
-				name: 'ai-agent',
+			// 调用本地后端的 TTS 接口（替代原 uniCloud.callFunction）
+			uni.request({
+				url: (options.baseUrl || 'http://localhost:3000') + '/api/tts',
+				method: 'POST',
 				data: {
-					action: 'tts',
-					data: {
-						params: {
-							text: text.slice(0, 100),
-							vcn: options.vcn || 'x4_yezi'
-						}
+					text: text.slice(0, 100),
+					vcn: options.vcn || 'x4_yezi'
+				},
+				header: { 'Content-Type': 'application/json' },
+				success: (res) => {
+					const result = res && res.data
+					if (result && result.audio) {
+						if (typeof handlers.onStart === 'function') handlers.onStart()
+						ctx = uni.createInnerAudioContext()
+						ctx.src = 'data:audio/mp3;base64,' + result.audio
+						ctx.onEnded(() => {
+							if (typeof handlers.onEnd === 'function') handlers.onEnd()
+						})
+						ctx.onError(() => {
+							if (typeof handlers.onEnd === 'function') handlers.onEnd()
+						})
+						ctx.play()
+					} else {
+						// 服务端降级：不出声
+						if (typeof handlers.onEnd === 'function') handlers.onEnd()
 					}
-				}
-			}).then((res) => {
-				const result = res && res.result
-				if (result && result.audio) {
-					if (typeof handlers.onStart === 'function') handlers.onStart()
-					ctx = uni.createInnerAudioContext()
-					ctx.src = 'data:audio/mp3;base64,' + result.audio
-					ctx.onEnded(() => {
-						if (typeof handlers.onEnd === 'function') handlers.onEnd()
-					})
-					ctx.onError(() => {
-						if (typeof handlers.onEnd === 'function') handlers.onEnd()
-					})
-					ctx.play()
-				} else {
-					// 云端降级：不出声
+				},
+				fail: () => {
 					if (typeof handlers.onEnd === 'function') handlers.onEnd()
 				}
-			}).catch(() => {
-				if (typeof handlers.onEnd === 'function') handlers.onEnd()
 			})
 		},
 

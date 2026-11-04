@@ -1,17 +1,15 @@
 <script>
-	import uniIdPageInit from '@/uni_modules/uni-id-pages/init.js';
 	import { ensureSession } from '@/utils/session.js';
 	export default {
 		onLaunch: async function() {
 			
 			
 			console.log('App Launch')
-			await uniIdPageInit()
 			
-			// 冷启动会话健康检查（Sprint 1 自研）
+			// 冷启动会话健康检查（Sprint 1 自研，Sprint 5 改为本地 HTTP 后端）
 			// 目的：token 若已过期，在用户操作前就完成刷新或引导重登，
 			//       避免「打卡/下单」等关键操作静默失败。
-			// 边界：审计服务不可用时保守放行，不阻断启动。
+			// 边界：后端服务不可用时保守放行，不阻断启动。
 			try {
 				const status = await ensureSession({ silent: true })
 				console.log('[session] 冷启动检查:', JSON.stringify(status))

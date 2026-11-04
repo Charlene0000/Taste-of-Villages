@@ -117,6 +117,9 @@
 </template>
 
 <script>
+import { businessApi } from '@/utils/auth.js'
+import { checkAuth } from '@/utils/router-guard.js'
+
 
 export default {
   data() {
@@ -144,6 +147,9 @@ export default {
     }
   },
   onLoad(options) {
+    // 路由守卫：未登录访问受保护页面时跳登录
+    if (!checkAuth()) return
+
     this.slug = options.slug || '';
     
     this.locationId = options.locationId || options.id || '';
@@ -181,13 +187,10 @@ export default {
 
       uni.showLoading({ title: '加载中...' });
       try {
-        const res = await uniCloud.callFunction({
-          name: 'get_village_info',
-          data: query
-        });
+        const res = await businessApi.get_village_info(query);
         
-        if (res.result && res.result.code === 200) {
-          this.villageData = res.result.data;
+        if (res && res.code === 200) {
+          this.villageData = res.data;
           
           if (!this.locationId && this.villageData._id) {
               this.locationId = this.villageData._id;
@@ -250,15 +253,12 @@ export default {
     async fetchUserStatus() {
         if (!this.openid || !this.locationId) return;
         try {
-            const res = await uniCloud.callFunction({
-                name: 'getUserCheckedSpots',
-                data: {
+            const res = await businessApi.getUserCheckedSpots({
                     openid: this.openid,
                     locationId: this.locationId
-                }
-            });
-            if (res.result && res.result.code === 200) {
-                const logs = res.result.data;
+                });
+            if (res && res.code === 200) {
+                const logs = res.data;
                 
                 this.attractions.forEach(item => {
                     const spotType = `spot_${item.name}`;
@@ -296,8 +296,8 @@ export default {
 
     async checkLoginStatus() {
         
-        const userInfo = uni.getStorageSync('uni-id-pages-userInfo') 
-          || uni.getStorageSync('uni_id_userinfo');
+        const userInfo = uni.getStorageSync('app_user_info') 
+          || uni.getStorageSync('app_user_info');
         if (userInfo && userInfo._id) {
             this.openid = userInfo._id;
         }
@@ -323,7 +323,7 @@ export default {
         if (!this.openid) {
             uni.showToast({ title: '请先登录', icon: 'none' });
              uni.navigateTo({
-                url: '/uni_modules/uni-id-pages/pages/login/login-withpwd'
+                url: '/pages/login/login'
               });
             return;
         }
@@ -347,9 +347,7 @@ export default {
         try {
             const uniqueType = `spot_${item.name}`;
 
-            const res = await uniCloud.callFunction({
-                name: 'checkIn', 
-                data: {
+            const res = await businessApi.checkIn({
                     openid: this.openid,
                     checkType: uniqueType, 
                     locationName: this.villageData.name,
@@ -361,17 +359,16 @@ export default {
                     },
                     targetLocation: this.targetLocation, 
                     timestamp: Date.now()
-                }
-            });
+                });
 
             uni.hideLoading();
             
-            if (res.result && (res.result.code === 200 || res.result.code === 0)) {
+            if (res && (res.code === 200 || res.code === 0)) {
                 item.checked = true;
                 uni.showToast({ title: '打卡成功 +35积分', icon: 'success' });
             } else {
                  uni.showToast({ 
-                     title: res.result.message || '打卡失败', 
+                     title: res.message || '打卡失败', 
                      icon: 'none' 
                  });
             }

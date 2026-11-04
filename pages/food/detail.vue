@@ -65,6 +65,7 @@
 </template>
 
 <script>
+import { businessApi } from '@/utils/auth.js'
 	export default {
 		data() {
 			return {
@@ -107,13 +108,10 @@
 			async fetchFoodInfo(slug) {
 				this.loading = true;
 				try {
-					const res = await uniCloud.callFunction({
-						name: 'get_food_info',
-						data: { slug: slug }
-					});
+					const res = await businessApi.get_food_info({ slug: slug });
 					
-					if (res.result.code === 0) {
-						const data = res.result.data;
+					if (res.code === 0) {
+						const data = res.data;
 						if (data.story_paragraphs && Array.isArray(data.story_paragraphs)) {
 							data.story_paragraphs = data.story_paragraphs.map(p => 
 								p.replace(/<text class="highlight">/g, '<span style="color: #D87A46; font-weight: bold; background: linear-gradient(to top, rgba(216, 122, 70, 0.1) 50%, transparent 50%); display: inline-block;">')

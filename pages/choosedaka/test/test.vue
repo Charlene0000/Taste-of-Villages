@@ -78,6 +78,9 @@
 </template>
 
 <script>
+import { businessApi } from '@/utils/auth.js'
+import { checkAuth } from '@/utils/router-guard.js'
+
 export default {
 	data() {
 		return {
@@ -138,6 +141,9 @@ export default {
         }
     },
 	onLoad(options) {
+	  // 路由守卫：未登录访问受保护页面时跳登录
+	  if (!checkAuth()) return
+
         const info = uni.getSystemInfoSync();
         this.statusBarHeight = info.statusBarHeight || 20;
 
@@ -157,12 +163,9 @@ export default {
         async fetchQuestions() {
             this.loading = true;
             try {
-                const res = await uniCloud.callFunction({
-                    name: 'get_quiz_questions',
-                    data: { slug: this.slug || 'default' }
-                });
-                if (res.result && res.result.code === 200) {
-                    this.questions = res.result.data.map(q => ({
+                const res = await businessApi.get_quiz_questions({ slug: this.slug || 'default' });
+                if (res && res.code === 200) {
+                    this.questions = res.data.map(q => ({
                         question: q.title,
                         options: q.options,
                         answer: q.answerIndex,
@@ -180,7 +183,7 @@ export default {
         },
 		checkLoginStatus() {
 			try {
-				const userInfo = uni.getStorageSync('uni-id-pages-userInfo') || uni.getStorageSync('uni_id_userinfo')
+				const userInfo = uni.getStorageSync('app_user_info') || uni.getStorageSync('app_user_info')
 				if (userInfo && userInfo._id) this.openid = userInfo._id
 			} catch (e) {
 				console.error('检查登录失败', e)
@@ -191,9 +194,9 @@ export default {
 			try {
 				const data = { openid: this.openid, checkOnly: true }
 				if (this.locationId) data.locationId = this.locationId
-				const res = await uniCloud.callFunction({ name: 'quizCheckIn', data })
-				if (res && res.result && res.result.code === 200) {
-					this.doneToday = !!res.result.data.doneForLocation
+				const res = await businessApi.quizCheckIn(data)
+				if (res && res.code === 200) {
+					this.doneToday = !!res.data.doneForLocation
                     if (this.doneToday) {
                         
                         this.completed = true;
@@ -243,7 +246,7 @@ export default {
         },
 
 		async submitResult() {
-			if (!this.openid) { uni.navigateTo({url: '/uni_modules/uni-id-pages/pages/login/login-withoutpwd'}); return }
+			if (!this.openid) { uni.navigateTo({url: '/pages/login/login'}); return }
             if (this.hasSubmittedThisSession) { uni.showToast({title:'已领取过啦', icon:'none'}); return; }
 
 			this.submitting = true
@@ -256,9 +259,9 @@ export default {
 					locationId: this.locationId,
                     slug: this.slug
 				};
-				const res = await uniCloud.callFunction({ name: 'quizCheckIn', data })
+				const res = await businessApi.quizCheckIn(data)
 
-				if (res && res.result && res.result.code === 200) {
+				if (res && res.code === 200) {
                     
                     this.hasSubmittedThisSession = true;
                     this.doneToday = true;
@@ -266,7 +269,7 @@ export default {
                     uni.hideLoading();
                     
                     uni.showToast({ 
-                        title: `获得 ${res.result.data.score || 50} 积分!`, 
+                        title: `获得 ${res.data.score || 50} 积分!`, 
                         icon: 'success',
                         duration: 2000
                     });
@@ -277,7 +280,7 @@ export default {
                     }, 2000);
                 } else {
                     uni.hideLoading();
-                    uni.showToast({ title: res.result.message || '领取失败', icon: 'none' })
+                    uni.showToast({ title: res.message || '领取失败', icon: 'none' })
                 }
 			} catch (e) {
 				console.error(e)

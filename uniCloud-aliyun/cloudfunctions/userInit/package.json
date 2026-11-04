@@ -1,9 +1,0 @@
-{
-    "name": "userInit",
-    "dependencies": {},
-    "extensions": {
-        "uni-cloud-jql": {}
-    },
-    "author": "CharLene",
-    "license": "MIT"
-}

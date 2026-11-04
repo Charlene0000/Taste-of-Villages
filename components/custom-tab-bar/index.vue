@@ -86,7 +86,7 @@ export default {
           name: '我的',
           iconPath: '/static/icon/mine.png',
           selectedIconPath: '/static/icon/mine-active.png',
-          pagePath: '/uni_modules/uni-id-pages/pages/userinfo/userinfo'
+          pagePath: '/pages/userinfo/userinfo'
         }
       ],
       currIndex: 0

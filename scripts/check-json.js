@@ -59,8 +59,8 @@ function collectJsonFiles(dir, acc) {
 }
 
 /**
- * 判断文件是否为 uniCloud 的 JSONL 数据格式
- * —— 形如 uniCloud-aliyun/database/*.json，每行是一条独立的 JSON 记录。
+ * 判断文件是否为 JSONL 数据格式（每行一条独立 JSON）
+ * —— 每行是一条独立的 JSON 记录。
  * 这类文件整体不是合法 JSON，但逐行是。
  */
 function isJsonlFormat(raw) {
@@ -84,7 +84,7 @@ function isJsonlFormat(raw) {
 }
 
 /**
- * uniCloud 的 schema 文件允许顶部出现 `//` 行注释（官方模板即如此）。
+ * 部分 schema 文件允许顶部出现 `//` 行注释。
  * 校验前先剥离整行注释，再尝试解析。
  */
 function stripLineComments(raw) {
@@ -158,7 +158,7 @@ function main() {
 	console.log('扫描文件数: ' + files.length)
 	const fmtDesc = {
 		json: '标准 JSON',
-		jsonl: 'JSONL（uniCloud 数据文件）',
+		jsonl: 'JSONL（每行独立 JSON 的数据文件）',
 		'json-with-comments': 'JSON（含行注释 schema）'
 	}
 	for (const key of Object.keys(formatCount)) {

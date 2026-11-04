@@ -72,6 +72,8 @@
 </template>
 
 <script>
+import { businessApi } from '@/utils/auth.js'
+import { getToken, getUserInfo } from '@/utils/request.js'
 	import CustomTabBar from '@/components/custom-tab-bar/index.vue'
 
 	export default {
@@ -100,10 +102,10 @@
                 try {
                     this.loading = true;
                     
-                    const listRes = await uniCloud.callFunction({ name: 'get_villages_list' });
-                    if (listRes.result && listRes.result.code === 200) {
+                    const listRes = await businessApi.get_villages_list();
+                    if (listRes && listRes.code === 200) {
                         
-                        this.villageList = (listRes.result.data || []).map(v => ({
+                        this.villageList = (listRes.data || []).map(v => ({
                             ...v,
                             checkedCount: 0,
                             progress: 0
@@ -126,27 +128,20 @@
                 
                 let openid = '';
                 try {
-                    const info = uni.getStorageSync('uni_id_token_expired') > Date.now() ? uni.getStorageSync('uni_id_token') : '';
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    const userRes = await uniCloud.getCurrentUserInfo();
-                    openid = userRes.uid;
+                    // 从本地登录态读取用户标识（替代 uniCloud.getCurrentUserInfo）
+                    const token = getToken()
+                    if (token) {
+                        const info = getUserInfo()
+                        openid = info ? (info.id || info.mobile || '') : ''
+                    }
                 } catch(e) {}
 
                 if (!openid) return; 
 
-                const progressRes = await uniCloud.callFunction({
-                    name: 'getCheckInRecords',
-                    data: { openid }
-                });
+                const progressRes = await businessApi.getCheckInRecords({ openid });
 
-                if (progressRes.result && progressRes.result.code === 200) {
-                    const records = progressRes.result.data;
+                if (progressRes && progressRes.code === 200) {
+                    const records = progressRes.data;
                     
                     this.villageList = this.villageList.map(v => {
                         const rec = records.find(r => r.slug === v.slug);

@@ -122,6 +122,7 @@
 </template>
 
 <script>
+import { businessApi } from '@/utils/auth.js'
 import CustomTabBar from '@/components/custom-tab-bar/index.vue'
 import DailySignin from '@/components/daily-signin/daily-signin.vue'
 
@@ -187,7 +188,7 @@ export default {
 
 		checkLogin() {
 			try {
-				const userInfo = uni.getStorageSync('uni-id-pages-userInfo') || uni.getStorageSync('uni_id_userinfo')
+				const userInfo = uni.getStorageSync('app_user_info') || uni.getStorageSync('app_user_info')
 				if (userInfo && userInfo._id) this.openid = userInfo._id
 			} catch (e) { console.error('检查登录失败', e) }
 		},
@@ -200,12 +201,9 @@ export default {
         async fetchMyItems() {
             if (!this.openid) return;
             try {
-                const res = await uniCloud.callFunction({
-                    name: 'get_user_orders',
-                    data: { openid: this.openid }
-                });
-                if (res.result && res.result.code === 200) {
-                    this.myItems = res.result.data || [];
+                const res = await businessApi.get_user_orders({ openid: this.openid });
+                if (res && res.code === 200) {
+                    this.myItems = res.data || [];
                 }
             } catch (e) {
                 console.error('Fetch My Items Error:', e);
@@ -215,9 +213,9 @@ export default {
 		async fetchPoints() {
 			if (!this.openid) return
 			try {
-				const res = await uniCloud.callFunction({ name: 'userInit', data: { openid: this.openid } })
-				if (res && res.result && res.result.code === 200) {
-					const p = Number(res.result.data.points) || 0;
+				const res = await businessApi.userInit({ openid: this.openid })
+				if (res && res && res.code === 200) {
+					const p = Number(res.data.points) || 0;
                     this.points = p;
                     
                     if (this.displayPoints === 0) {
@@ -230,12 +228,10 @@ export default {
 		async fetchGoods() {
 			this.loading = true;
 			try {
-				const res = await uniCloud.callFunction({
-					name: 'get_shop_goods'
-				});
-				if (res.result && res.result.code === 200) {
+				const res = await businessApi.get_shop_goods();
+				if (res && res.code === 200) {
 					
-					const rawData = res.result.data || [];
+					const rawData = res.data || [];
 					this.goods = rawData.filter(item => item && typeof item === 'object');
 				}
                 
@@ -278,7 +274,7 @@ export default {
 			if (!this.openid) { 
                 uni.showToast({ title: '请先登录', icon: 'none' });
                  setTimeout(() => {
-                    uni.navigateTo({ url: '/uni_modules/uni-id-pages/pages/login/login-withpwd' })
+                    uni.navigateTo({ url: '/pages/login/login' })
                  }, 1000);
                 return;
             }
@@ -286,18 +282,15 @@ export default {
 
 			uni.showLoading({ title: '兑换中...' })
 			try {
-				const res = await uniCloud.callFunction({ 
-					name: 'purchaseItem', 
-					data: { 
+				const res = await businessApi.purchaseItem({ 
 						openid: this.openid, 
 						itemId: item._id, 
 						itemName: item.name, 
 						cost: item.cost,
 						imgUrl: item.img_url || item.emoji 
-					} 
-				})
+					})
 				
-				const r = res.result
+				const r = res
 				if (r && r.code === 200) {
 					uni.showToast({ title: '兑换成功!', icon: 'success' })
                     this.animatePoints(this.displayPoints || this.points || 0, r.data.newPoints);

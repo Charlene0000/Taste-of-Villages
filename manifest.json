@@ -2,7 +2,7 @@
     "name" : "跨境共生小程序",
     "appid" : "__UNI__616805C",
     "author" : "CharLene",
-    "description" : "跨境共生 · 乡村美食打卡小程序（uni-app + uniCloud，含 AI 美食向导与数字人交互层）",
+    "description" : "跨境共生 · 乡村美食打卡小程序（uni-app 前端 + Express 后端，含自研 Agent 编排层与数字人交互层）",
     "versionName" : "1.0.0",
     "versionCode" : "100",
     "transformPx" : false,
@@ -152,7 +152,6 @@
             "mode" : "hash"
         }
     },
-    "_spaceID" : "9f6xxxxxxxxxxxxxxxxxxxx3fe4",
     "fallbackLocale" : "zh-Hans",
     "locale" : "zh-Hans"
 }

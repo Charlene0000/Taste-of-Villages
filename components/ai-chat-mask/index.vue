@@ -117,6 +117,7 @@
 </template>
 
 <script>
+import { agentApi } from '@/utils/auth.js'
 export default {
   name: 'CongmeiInteractPopup',
   data() {
@@ -176,7 +177,7 @@ export default {
     this.checkFeatureStatus();
 
     
-    let userInfo = uni.getStorageSync('uni-id-pages-userInfo');
+    let userInfo = uni.getStorageSync('app_user_info');
     if (!userInfo) {
         userInfo = uni.getStorageSync('userInfo');
     }
@@ -191,12 +192,9 @@ export default {
     async checkFeatureStatus() {
         this.isLoadingFeature = true;
         try {
-            const res = await uniCloud.callFunction({
-                name: 'ai-agent',
-                data: { action: 'checkStatus' }
-            });
+            const res = await agentApi.chat({ action: 'checkStatus' });
             
-            if (res.result && res.result.enable === true) {
+            if (res && res.enable === true) {
                 this.isFeatureEnabled = true;
             } else {
                 this.isFeatureEnabled = false;
@@ -280,24 +278,21 @@ export default {
       6. 回答仅使用纯文本，禁止使用*、#、-、加粗、列表等任何格式符号。`;
       
       try {
-          const res = await uniCloud.callFunction({
-              name: 'ai-agent',
-              data: {
+          const res = await agentApi.chat({
                   action: 'chat',
-                  uid: (uni.getStorageSync('uni-id-pages-userInfo') || uni.getStorageSync('userInfo'))?._id || '',
+                  uid: (uni.getStorageSync('app_user_info') || uni.getStorageSync('userInfo'))?._id || '',
                   data: {
                       messages: [
                         { role: 'system', content: systemPrompt },
                         { role: 'user', content: userQuestion }
                       ]
                   }
-              }
-          });
+              });
           
           this.isSending = false;
           
-          if (res.result && res.result.code === 200 && res.result.result?.choices?.[0]) {
-             let reply = res.result.result.choices[0].message.content || '我暂时无法回答这个问题';
+          if (res && res.code === 200 && res?.choices?.[0]) {
+             let reply = res.choices[0].message.content || '我暂时无法回答这个问题';
              
              
              reply = reply.replace(/\*/g, '').trim();
@@ -356,21 +351,18 @@ export default {
             console.log('Sending TTS request to Cloud Function...');
             
             
-            const cloudRes = await uniCloud.callFunction({
-                name: 'ai-agent',
-                data: {
+            const cloudRes = await agentApi.chat({
                     action: 'tts',
                     data: {
                         params: params,
                         timestamp: timestamp,
                         date: date
                     }
-                }
-            });
+                });
             
-            if (cloudRes.result && cloudRes.result.code === 200 && cloudRes.result.audio) {
+            if (cloudRes && cloudRes.code === 200 && cloudRes.audio) {
                 console.log('TTS audio received from cloud');
-                this.playAudio(cloudRes.result.audio);
+                this.playAudio(cloudRes.audio);
             } else {
                 console.error('Failed to get audio from cloud:', cloudRes);
             }

@@ -76,6 +76,10 @@
 </template>
 
 <script>
+import { businessApi } from '@/utils/auth.js'
+import { checkAuth } from '@/utils/router-guard.js'
+
+import { upload } from '@/utils/request.js'
 export default {
   data() {
     return {
@@ -94,6 +98,9 @@ export default {
     }
   },
   onLoad(options) {
+    // 路由守卫：未登录访问受保护页面时跳登录
+    if (!checkAuth()) return
+
     if (options) {
       if (options.locationId) this.locationId = options.locationId
       if (options.lat && options.lng && !isNaN(parseFloat(options.lat)) && !isNaN(parseFloat(options.lng))) {
@@ -121,8 +128,8 @@ export default {
     },
     checkLoginStatus() {
       try {
-        const userInfo = uni.getStorageSync('uni-id-pages-userInfo') 
-          || uni.getStorageSync('uni_id_userinfo');
+        const userInfo = uni.getStorageSync('app_user_info') 
+          || uni.getStorageSync('app_user_info');
         if (userInfo && userInfo._id) {
           this.openid = userInfo._id;
           this.lastPoints = userInfo.score || 0; 
@@ -177,32 +184,18 @@ export default {
         
         const cloudUrls = [];
         for (let path of this.images) {
-          const authRes = await uniCloud.callFunction({ name: 'getCosAuth' });
-          if (!authRes.result || !authRes.result.url) throw new Error('获取签名失败');
-          
-          const auth = authRes.result;
-          await new Promise((resolve, reject) => {
-            uni.uploadFile({
-              url: auth.url,
-              filePath: path,
-              name: 'file',
-              formData: auth.formData,
-              success: () => resolve(),
-              fail: reject
-            });
-          });
-          cloudUrls.push(`${auth.url}/${auth.formData.key}`);
+          // 上传到本地后端（替代原腾讯云 COS 直传）
+          const upRes = await upload(path)
+          if (!upRes || !upRes.url) throw new Error('上传失败');
+          cloudUrls.push(upRes.url);
         }
 
         
         uni.showLoading({ title: '饼饼品鉴中...' });
-        const aiRes = await uniCloud.callFunction({
-          name: 'analyzeFoodPhoto',
-          data: { fileID: cloudUrls[0] }
-        });
+        const aiRes = await businessApi.analyzeFoodPhoto({ fileID: cloudUrls[0] });
 
-        if (aiRes.result && aiRes.result.code === 200) {
-          this.aiResult = aiRes.result.data;
+        if (aiRes && aiRes.code === 200) {
+          this.aiResult = aiRes.data;
           
           if (!this.aiResult.isFood) {
             this.isProcessing = false;
@@ -212,9 +205,7 @@ export default {
         }
 
         
-        await uniCloud.callFunction({
-          name: 'saveUserPhotos',
-          data: {
+        await businessApi.saveUserPhotos({
             openid: this.openid,
             photos: [{
               url: cloudUrls[0],
@@ -222,13 +213,10 @@ export default {
               locationName: this.currentLocationName,
               createTime: Date.now()
             }]
-          }
-        });
+          });
 
         
-        const checkRes = await uniCloud.callFunction({
-          name: 'checkIn',
-          data: {
+        const checkRes = await businessApi.checkIn({
             openid: this.openid,
             location: this.location,
             targetLocation: this.targetLocation,
@@ -236,15 +224,14 @@ export default {
             maxDistance: 10000000, 
             checkType: 'photo',
             images: cloudUrls
-          }
-        });
+          });
 
         uni.hideLoading();
         this.isProcessing = false; 
 
-        if (checkRes.result && checkRes.result.code === 200) {
+        if (checkRes && checkRes.code === 200) {
           
-          const currentPoints = checkRes.result.data.currentPoints || 0;
+          const currentPoints = checkRes.data.currentPoints || 0;
           const msg = (currentPoints > this.lastPoints) ? '打卡成功，+70积分' : '打卡成功';
           this.lastPoints = currentPoints; 
           
@@ -257,7 +244,7 @@ export default {
             uni.pageScrollTo({ scrollTop: 9999, duration: 300 });
           });
         } else {
-          uni.showToast({ title: checkRes.result.message || '打卡失败', icon: 'none' });
+          uni.showToast({ title: checkRes.message || '打卡失败', icon: 'none' });
         }
 
       } catch (e) {
@@ -270,12 +257,9 @@ export default {
     async checkPhotoStatus() {
       if (!this.openid || this.locationId == null) return;
       try {
-        const res = await uniCloud.callFunction({
-          name: 'userInit',
-          data: { openid: this.openid, locationId: this.locationId, checkType: 'photo' }
-        });
-        if (res.result && res.result.code === 200) {
-          this.isCheckedPhoto = !!res.result.data.alreadyCheckedPlace;
+        const res = await businessApi.userInit({ openid: this.openid, locationId: this.locationId, checkType: 'photo' });
+        if (res && res.code === 200) {
+          this.isCheckedPhoto = !!res.data.alreadyCheckedPlace;
         }
       } catch (e) {
         console.error('检查状态失败', e)

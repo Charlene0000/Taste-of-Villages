@@ -72,28 +72,32 @@ function loadConfig () {
  * @param {string} prompt
  * @param {Object} config
  * @returns {Promise<string>}
+ *
+ * 说明：Sprint 5 架构重构后，LLM 调用改由服务端承担
+ * （server/src/services/agent.js），前端不再直接发起外部请求。
+ * 本适配器保留给「前端独立运行」的场景（如纯浏览器调试），
+ * 使用 fetch 而非 uniCloud.httpclient。
  */
 async function callLLM (prompt, config) {
-	const response = await uniCloud.httpclient.request(config.apiUrl || DEFAULT_API_URL, {
+	const response = await fetch(config.apiUrl || DEFAULT_API_URL, {
 		method: 'POST',
-		dataType: 'json',
-		timeout: 30000,
 		headers: {
 			'Content-Type': 'application/json',
 			'Authorization': `Bearer ${config.apiKey}`
 		},
-		data: {
+		body: JSON.stringify({
 			model: config.model || DEFAULT_MODEL,
 			messages: [{ role: 'user', content: prompt }],
 			stream: false,
 			temperature: 0
-		}
+		})
 	})
 
-	if (response.status !== 200) {
+	if (!response.ok) {
 		throw new Error(`LLM 请求失败: HTTP ${response.status}`)
 	}
-	const choice = response.data && response.data.choices && response.data.choices[0]
+	const data = await response.json()
+	const choice = data && data.choices && data.choices[0]
 	if (!choice || !choice.message) {
 		throw new Error('LLM 返回格式错误')
 	}

@@ -68,9 +68,10 @@
 </template>
 
 <script>
+import { businessApi } from '@/utils/auth.js'
 import CustomTabBar from '@/components/custom-tab-bar/index.vue'
 
-import { store } from '@/uni_modules/uni-id-pages/common/store.js'
+import { getUserInfo } from '@/utils/request.js'
 
 export default {
 	components: {
@@ -102,19 +103,16 @@ export default {
 			uni.navigateBack()
 		},
 		async fetchData() {
-			const openid = this.userInfo._id || uni.getStorageSync('uni-id-pages-userInfo')._id;
+			const openid = this.userInfo._id || uni.getStorageSync('app_user_info')._id;
 			if (!openid) return;
 			
 			try {
 				this.loading = true;
-				const res = await uniCloud.callFunction({
-					name: 'getCheckInRecords',
-					data: { openid }
-				});
+				const res = await businessApi.getCheckInRecords({ openid });
 				
-				if (res.result && res.result.code === 200) {
+				if (res && res.code === 200) {
 					// 映射真实数据到勋章列表
-					this.medalList = res.result.data.map((item, index) => {
+					this.medalList = res.data.map((item, index) => {
 						const colors = ['#E57373', '#81C784', '#64B5F6', '#FFB74D', '#9575CD', '#4DB6AC'];
 						return {
 							name: item.name + '勋章',

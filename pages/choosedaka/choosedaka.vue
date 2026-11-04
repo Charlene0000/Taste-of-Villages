@@ -53,6 +53,9 @@
 </template>
 
 <script>
+import { agentApi } from '@/utils/auth.js'
+import { checkAuth } from '@/utils/router-guard.js'
+
 	export default {
 		data() {
 			return {
@@ -86,6 +89,9 @@
 			}
 		},
         onLoad(options) {
+          // 路由守卫：未登录访问受保护页面时跳登录
+          if (!checkAuth()) return
+
             
             this.checkPhotoFeatureStatus();
             
@@ -122,12 +128,9 @@
             async checkPhotoFeatureStatus() {
                 this.isLoadingFeature = true;
                 try {
-                    const res = await uniCloud.callFunction({
-                        name: 'ai-agent',
-                        data: { action: 'checkStatus' }
-                    });
+                    const res = await agentApi.chat({ action: 'checkStatus' });
                     
-                    if (res.result && res.result.enable === true) {
+                    if (res && res.enable === true) {
                         this.isPhotoEnabled = true;
                     } else {
                         this.isPhotoEnabled = false;

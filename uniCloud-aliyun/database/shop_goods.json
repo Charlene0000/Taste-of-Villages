@@ -1,7 +1,0 @@
-{"_id":{"$oid":"69b112760226e245a49ea6e7"},"name":"手机壳·款一","description":"创意手机壳 (款式A)","cost":200,"img_url":"https://village-1369475595.cos.ap-guangzhou.myqcloud.com/static/shop/shoujike1.jpg","stock":200}
-{"_id":{"$oid":"69b112760226e245a49ea6e8"},"name":"特产沙琪玛","description":"海胆味沙琪玛 1盒","cost":500,"img_url":"https://village-1369475595.cos.ap-guangzhou.myqcloud.com/static/shop/shaqima.png","stock":100}
-{"_id":{"$oid":"69b112760226e245a49ea6e4"},"name":"古风扇子·款二","description":"国潮折扇 (款式B)","cost":320,"img_url":"https://village-1369475595.cos.ap-guangzhou.myqcloud.com/static/shop/shanzi2.jpg","stock":45}
-{"_id":{"$oid":"69b112760226e245a49ea6e9"},"name":"古风扇子·款一","description":"国潮折扇 (款式A)","cost":300,"img_url":"https://village-1369475595.cos.ap-guangzhou.myqcloud.com/static/shop/shanzi1.jpg","stock":50}
-{"_id":{"$oid":"69b112760226e245a49ea6e3"},"name":"明信片","description":"精美风景明信片","cost":150,"img_url":"https://village-1369475595.cos.ap-guangzhou.myqcloud.com/static/shop/mingxinpian.jpg","stock":999}
-{"_id":{"$oid":"69b112760226e245a49ea6e5"},"name":"趣味贴纸","description":"手账贴纸套装","cost":80,"img_url":"https://village-1369475595.cos.ap-guangzhou.myqcloud.com/static/shop/tiezhi.jpg","stock":500}
-{"_id":{"$oid":"69b112760226e245a49ea6e6"},"name":"手机壳·款二","description":"创意手机壳 (款式B)","cost":210,"img_url":"https://village-1369475595.cos.ap-guangzhou.myqcloud.com/static/shop/shoujike2.jpg","stock":180}

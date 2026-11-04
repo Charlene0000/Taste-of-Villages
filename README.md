@@ -1,9 +1,17 @@
 # 跨境共生小程序 · Cross-Border Symbiosis
 
 > **乡村美食打卡小程序 + 自研 Agent 编排层 + 自研数字人交互层**
-> 基于 uni-app (Vue 2) + uniCloud (阿里云) 构建，零配置可运行，不依赖任何收费 API。
+> 前后端分离架构：uni-app (Vue 2) 前端 + Node.js/Express 后端 + SQLite 数据库。
+> **零付费云依赖，不需要注册任何云账号，本地即可完整跑通。**
 
-**Author: CharLene** · **License: MIT** · **当前版本: v1.0.0 (Sprint 0–4 完成)**
+**Author: CharLene** · **License: MIT** · **当前版本: v2.0.0 (Sprint 0–5 完成)**
+
+> 📌 **Sprint 5 架构重构说明**
+> 本项目在 Sprint 5 从 uniCloud（BaaS）重构为**标准前后端分离**架构。
+> 起因是阿里云免费空间停止申请，原有后端无法继续使用。
+> 重构后**彻底移除了 uniCloud 依赖**：云函数、云数据库、官方 uni-id 模块全部删除，
+> 登录、Agent、业务数据全部由本地 Express 服务承载。
+> 详见 [Getting Started](#getting-started) 与 [Architecture](#architecture)。
 
 ---
 
@@ -23,25 +31,47 @@
 
 这三件事的共性是：**表面功能可用，底层机制缺失**。本项目的价值不在于堆功能，而在于把这三处"能跑但不对"的地方，换成**可解释、可测试、可在面试中讲清楚**的自研机制。
 
-项目采用 **Sprint 0 → 4 的敏捷迭代**，每个 Sprint 都有可运行增量，git 历史完整呈现迭代过程。
+项目采用 **Sprint 0 → 5 的敏捷迭代**，每个 Sprint 都有可运行增量，git 历史完整呈现迭代过程。
+
+Sprint 5 增加了一层考验：**把后端从 uniCloud 整体换成自建 Express 服务**，
+同时证明「换后端没有引入安全退化」。这比单纯的功能开发更能体现工程判断力 ——
+架构迁移的风险不在于写不写得出来，而在于**会不会悄悄丢掉什么**。
 
 ---
 
 ## Tech Stack
 
+### 前端
+
 | 层次 | 技术选型 | 说明 |
 |---|---|---|
 | 跨端框架 | uni-app (Vue 2) | HBuilderX 工程，一套代码编译到微信小程序 / H5 / App(Android) |
 | 状态与视图 | Vue 2 Options API | 与既有 18 个业务页面保持一致，不做框架迁移 |
-| 路由与守卫 | `pages.json` + `uniIdRouter` | `needLogin` 声明受保护页面，`resToLogin` 开启自动跳登录 |
-| UI 组件 | DCloud 官方 uni_modules ×16 | `uni-id-pages` / `uni-forms` / `uni-easyinput` / `uni-list` / `uni-captcha` 等 |
-| 后端 | uniCloud (阿里云空间) | 21 个自研云函数 + 1 个配置读取公共模块 |
-| 账户体系 | uni-id-pages + uni-id-co | 手机号验证码 / 微信授权 / 一键登录 / 账密 |
-| 数据库 | uniCloud 云数据库 (MongoDB 协议) | 13 张表，schema 与种子数据分离 |
-| Agent 编排 | **自研**（Sprint 2） | planner / executor / memory / fallback / 工具注册表 / trace |
-| 数字人渲染 | **自研 Canvas 2D**（Sprint 3） | 无 Live2D、无二进制模型，形象由代码绘制 |
-| 配置管理 | uni-config-center + 自研 `app-config` | 密钥集中管理，源码零凭据 |
-| 打包 | HBuilderX 云打包 + GitHub Actions | Sprint 4 |
+| 网络层 | **自研 `utils/request.js`** | `uni.request` → Promise，自动携带 JWT，401 自动清凭证跳登录 |
+| 路由与守卫 | `pages.json` + **自研 `utils/router-guard.js`** | `authRouter.needLogin` 声明受保护页面 |
+| UI 组件 | DCloud 官方 uni_modules ×8 | `uni-forms` / `uni-easyinput` / `uni-popup` / `uni-icons` 等**纯 UI** 模块（不含云依赖） |
+
+### 后端
+
+| 层次 | 技术选型 | 说明 |
+|---|---|---|
+| 运行时 | Node.js ≥ 18 | 零外部服务依赖 |
+| Web 框架 | **Express 4** | RESTful API，路由按业务域拆分 |
+| 数据库 | **SQLite**（本地文件） | 零配置零成本，文件即数据库 |
+| ORM | **Prisma 6** | 10 张表，schema 即代码 |
+| 身份认证 | **JWT**（jsonwebtoken） | HS256 签名，7 天有效期 |
+| 密码加密 | **bcryptjs** | 密码登录路径使用 |
+| 验证码 | **crypto.randomInt** | CSPRNG，非 `Math.random` |
+| 跨域 | **cors** 中间件 | 默认允许全部来源，本地开发友好 |
+| 配置 | **dotenv** | `.env` 管理，`.env.example` 为模板 |
+| 文件上传 | **multer 2** | 替代原 `uniCloud.uploadFile` |
+| Agent 编排 | **自研**（复用 `agent/` 核心） | planner / executor / memory / fallback / 工具注册表 / trace |
+| 数字人渲染 | **自研 Canvas 2D** | 无 Live2D、无二进制模型，形象由代码绘制 |
+
+### 关键结论
+
+> **整个项目不依赖任何付费云服务，也不需要注册任何云账号。**
+> clone → `npm install` → `npx prisma db push` → `npm run dev`，即可在本地完整跑通。
 
 ---
 
@@ -52,129 +82,229 @@ graph TB
     subgraph Client["前端 · uni-app (Vue 2)"]
         UI["业务页面 ×18<br/>首页 / 商城 / 打卡 / 手账 / 勋章"]
         AIUI["AI 弹窗组件<br/>ai-chat-mask"]
-        AGENT["★ Agent 编排层<br/>planner · executor · memory<br/>fallback · trace · 工具注册表"]
+        REQ["★ utils/request.js<br/>uni.request → Promise<br/>自动带 JWT / 401 拦截"]
+        GUARD["★ utils/router-guard.js<br/>登录守卫"]
+        SESS["★ utils/session.js<br/>会话健康检查"]
         AVA["★ 数字人交互层<br/>AvatarController · LipSyncBridge<br/>Canvas 2D 渲染器"]
-        SESS["★ 会话健康检查<br/>utils/session.js"]
         DEMO["★ 演示页 ×2<br/>agent-demo · avatar-demo"]
+        LOGIN["★ pages/login/login<br/>手写登录页"]
+        USERINFO["★ pages/userinfo/userinfo<br/>手写用户中心"]
     end
 
-    subgraph Common["公共模块"]
-        CFG["★ app-config<br/>密钥读取 + 降级判定"]
+    subgraph Server["后端 · Node.js + Express"]
+        APP["src/app.js<br/>cors / json / 路由装配"]
+        AUTH["★ routes/auth.js<br/>send-code · login · register"]
+        USER["★ routes/user.js<br/>profile · session"]
+        BIZ["★ routes/business.js<br/>21 个业务接口聚合"]
+        AGENTR["★ routes/agent.js<br/>chat · run · history"]
+        GUARDS["★ utils/security.js<br/>CSPRNG / 频控 / 锁定 / 校验"]
+        JWT["★ middleware/auth.js<br/>JWT 签发与鉴权"]
+        AGSVC["★ services/agent.js<br/>知识库 + 规则回答"]
     end
 
-    subgraph Cloud["后端 · uniCloud (阿里云)"]
-        UID["uni-id-co<br/>账户体系（官方，未改动）"]
-        GATE["★ auth-gateway<br/>四道安全闸 + 转发"]
-        AUDIT["★ session-audit<br/>会话体检（纯读）"]
-        AGENTCF["ai-agent<br/>知识库 + LLM + TTS"]
-        BIZ["业务云函数 ×21<br/>打卡 / 商城 / 签到 / 照片"]
-        CENTER["uni-config-center"]
+    subgraph DB["数据库 · SQLite (Prisma)"]
+        T1["users<br/>含 loginCount / lastLoginAt / source"]
+        T2["verify_codes<br/>含 attempts / maxAttempts / 频控字段"]
+        T3["check_in_places"]
+        T4["user_photos"]
+        T5["user_orders"]
+        T6["chat_history"]
+        T7["shop_goods / quiz_questions<br/>villages / foods"]
     end
 
-    subgraph DB["云数据库"]
-        T1["uni-id-users"]
-        T2["opendb-verify-codes"]
-        T3["auth-sms-rate-limit ★"]
-        T4["ai-chat-history"]
-        T5["业务表 ×10"]
-    end
+    UI --> REQ
+    LOGIN --> REQ
+    USERINFO --> REQ
+    AIUI --> REQ
+    DEMO --> REQ
+    SESS --> REQ
+    UI --> GUARD
+    GUARD --> LOGIN
 
-    UI --> AGENT
-    DEMO --> AGENT
-    DEMO --> AVA
-    AGENT -->|avatar-speak 工具| AVA
-    AGENT -.->|工具调用| BIZ
-    UI --> SESS
-    SESS --> AUDIT
-    AGENTCF -.->|由工具间接调用| AGENT
-    AIUI --> AGENTCF
-    CFG --> AGENTCF
-    CFG --> GATE
-    UID --> CENTER
-    AGENTCF --> CENTER
-    GATE -->|转发| UID
-    UID --> DB
-    GATE --> DB
-    AUDIT --> DB
-    AGENTCF --> DB
+    REQ -->|HTTP| APP
+    APP --> AUTH
+    APP --> USER
+    APP --> BIZ
+    APP --> AGENTR
+
+    AUTH --> GUARDS
+    AUTH --> JWT
+    USER --> JWT
+    AGENTR --> AGSVC
+
+    AUTH --> DB
+    USER --> DB
     BIZ --> DB
+    AGENTR --> DB
+    AGSVC -.->|复用 agent/ 核心| AGENT
 
-    style AGENT fill:#e8f4ff,stroke:#4a90d9,stroke-width:2px
-    style AVA fill:#fff4e6,stroke:#e8944a,stroke-width:2px
-    style CFG fill:#eef7ee,stroke:#5aa55a,stroke-width:2px
-    style GATE fill:#e8f4ff,stroke:#4a90d9,stroke-width:2px
-    style AUDIT fill:#f4e8ff,stroke:#9b6dd9,stroke-width:2px
+    style REQ fill:#e8f4ff,stroke:#4a90d9,stroke-width:2px
+    style GUARD fill:#f4e8ff,stroke:#9b6dd9,stroke-width:2px
     style SESS fill:#f4e8ff,stroke:#9b6dd9,stroke-width:2px
+    style AVA fill:#fff4e6,stroke:#e8944a,stroke-width:2px
+    style GUARDS fill:#eef7ee,stroke:#5aa55a,stroke-width:2px
+    style JWT fill:#eef7ee,stroke:#5aa55a,stroke-width:2px
+    style AGSVC fill:#e8f4ff,stroke:#4a90d9,stroke-width:2px
+    style LOGIN fill:#fff4e6,stroke:#e8944a,stroke-width:2px
+    style USERINFO fill:#fff4e6,stroke:#e8944a,stroke-width:2px
 ```
 
-**★ 标记为本次迭代新增的自研模块**，其余为既有资产。
+**★ 标记为本次自研的模块**，其余为既有业务资产。
 
-> **一个关键架构约束**：HBuilderX 上传云函数时只打包 `cloudfunctions/<name>/` 目录，
-> **云函数无法 require 项目根的 `agent/`**。因此 Agent 编排层运行在**前端**，
-> 云端能力（知识库检索、LLM 推理、用户数据）通过**工具调用**接入。
-> 这不是偷懒，而是把「编排」放在离用户最近的地方 —— 工具执行结果能实时回传给用户。
+> **Sprint 5 的架构变更要点**
+>
+> | 变更 | 之前 | 之后 |
+> |---|---|---|
+> | 后端形态 | uniCloud 云函数（BaaS） | 独立 Node.js/Express 服务 |
+> | 数据库 | 阿里云云数据库 | 本地 SQLite 文件 |
+> | 账户体系 | 官方 uni-id-pages + uni-id-co | 自研 JWT + 自研登录页 |
+> | 请求层 | `uniCloud.callFunction` | `utils/request.js` 统一封装 |
+> | 路由守卫 | 官方 `uniIdRouter` | 自研 `utils/router-guard.js` |
+> | Agent 编排 | 前端运行 | **服务端运行**（后端可直接 require `agent/` 核心） |
+> | 文件上传 | 腾讯云 COS 直传 | 本地后端 `multer` |
+>
+> **Agent 编排层为什么搬到服务端？**
+> Sprint 2 时编排层放在前端，原因是「HBuilderX 上传云函数只打包 `cloudfunctions/<name>/`，
+> 云函数无法 require 项目根的 `agent/`」。成为独立 Node 服务后这个约束消失了：
+> 后端可以直接 `require('../../agent/core/planner')` 复用同一套编排核心，
+> 同时编排逻辑与知识库、用户数据同处一地，能直接查数据库，
+> 且多用户场景下 trace / memory 天然按用户隔离。
 
 ---
 
 ## Getting Started
 
+> 📌 **本项目是前后端分离架构**：前端是 uni-app（HBuilderX 工程），
+> 后端是独立的 Node.js/Express 服务，数据库是本地 SQLite 文件。
+>
+> **不需要注册任何云账号，不需要任何付费服务，clone 下来就能在本地完整跑通。**
+
 ### 环境要求
 
-- HBuilderX **3.8.5+**（本项目在 HBuilderX 中开发，非 CLI 工程）
-- 一个 uniCloud 服务空间（阿里云，免费额度即可）
+| 组件 | 版本 | 说明 |
+|---|---|---|
+| Node.js | **≥ 18** | 后端运行时 |
+| HBuilderX | **3.8.5+** | 前端开发（uni-app 工程，非 CLI） |
+| npm | ≥ 9 | 依赖管理 |
 
-### 步骤
+> 无需数据库服务、无需云账号、无需 Docker。
+
+---
+
+### 第一步：启动后端
+
+```bash
+cd server
+
+# 1. 安装依赖
+npm install
+
+# 2. 初始化 SQLite 数据库（生成 server/prisma/dev.db，建 10 张表）
+npx prisma db push
+
+# 3. 启动服务（默认 3000 端口）
+npm run dev
+```
+
+启动成功后会看到：
+
+```
+  ╭─────────────────────────────────────────────╮
+  │  跨境共生小程序 · 后端服务已启动              │
+  ╰─────────────────────────────────────────────╯
+
+  地址      http://localhost:3000
+  健康检查  http://localhost:3000/api/health
+  开发模式  开启（send-code 返回 devCode）
+```
+
+**验证后端已就绪**：
+
+```bash
+curl http://localhost:3000/api/health
+# {"code":200,"message":"服务运行中","uptime":1.13,"devMode":true}
+```
+
+> `dev.db` 已被 `.gitignore` 排除，不会进入版本库。
+> 想从零重建，删掉 `server/prisma/dev.db` 后重新 `npx prisma db push` 即可。
+
+---
+
+### 第二步：运行前端
 
 1. **导入项目**
-   HBuilderX → 文件 → 导入 → 从本地目录导入 → 选择本仓库根目录（`源代码/`）。
+   HBuilderX → 文件 → 导入 → 从本地目录导入 → 选择本仓库根目录。
 
-2. **关联 uniCloud 空间**
-   在 `uniCloud-aliyun/` 目录上右键 → 关联云服务空间 → 选择你的阿里云空间。
-   关联后 HBuilderX 会写入 `manifest.json` 的 `_spaceID` 与 `.hbuilderx/launch.json`（后者已被 `.gitignore` 排除）。
+2. **配置后端地址**
+   默认指向 `http://localhost:3000`（见 `utils/request.js` 的 `BASE_URL`）。
 
-3. **上传云函数与数据库**
-   右键 `uniCloud-aliyun/cloudfunctions/` → 上传所有云函数、公共模块。
-   右键 `uniCloud-aliyun/database/` → 上传所有 DB Schema。
-   右键 `uniCloud-aliyun/database/` → 上传所有 DB 数据文件（可选，仅用于演示种子数据）。
+   > ⚠️ **真机调试时需改为电脑的局域网 IP**，例如 `http://192.168.1.100:3000`，
+   > 否则手机的 `localhost` 指向手机自身。微信开发者工具中勾选「不校验合法域名」即可。
 
-4. **运行**
+3. **运行**
    菜单栏 运行 → 运行到浏览器 / 微信开发者工具 / 手机模拟器。
+
+4. **登录**
+   打开任意需要登录的页面（如「打卡」），会自动跳转到自研登录页
+   （`pages/login/login`）。输入任意 11 位手机号 → 获取验证码 → 登录。
+   **首次登录会自动创建用户。**
+
+---
 
 ### 开发阶段如何获取验证码
 
-本项目默认走**手机号验证码登录**。开发阶段的验证码获取方式取决于 `uni-id` 配置：
+后端在**开发模式**下（`server/.env` 的 `DEV_MODE=true`）不真实发送短信，
+而是把 6 位验证码直接写在响应里：
 
-- **未配置短信模板时**（仓库默认状态）：`uni-id-co` 进入测试模式，验证码固定为 `123456`，
-  云函数响应中会带明确提示。见 [Known Issues](#known-issues--limitations)。
-- **配置了真实短信模板时**：验证码通过短信下发到手机。
+```jsonc
+// POST /api/auth/send-code 的响应
+{
+  "code": 200,
+  "message": "验证码已生成（开发模式）",
+  "devCode": "964729",   // ← 填到这个位置
+  "expiresIn": 240
+}
+```
 
-> ⚠️ 固定验证码 `123456` 仅适用于本地开发。**生产环境必须配置 `service.sms.scene.*.templateId` 与 `smsKey`/`smsSecret`**，
-> 配置方式见 [`config.example.json`](./config.example.json)。
+登录页会自动显示这个 `devCode`（开发模式提示框），点「获取验证码」后直接可见。
+
+> ⚠️ **生产环境必须把 `DEV_MODE` 设为 `false`。**
+> 该模式下验证码会直接出现在接口响应里，等同于绕过短信验证。
+
+---
 
 ### 演示账号说明
 
-仓库内 `uniCloud-aliyun/database/uni-id-users.json` 只包含 **1 条脱敏演示种子数据**：
+数据库由 `npx prisma db push` 初始化，**不含任何预置账号**。
 
-- `mobile` 为 `189****2619` —— **这是不可拨打的占位符**，不是真实号码
-- `password` 为 `null` —— 该账号走手机号验证码登录，无需密码
-- `nickname` 为 `CharLene`
+用任意手机号走验证码流程即可自动注册。注册后：
 
-**实际登录时，使用任意手机号走验证码流程即可自动创建用户**，不影响演示。
+- `nickname` 默认为 `用户` + 手机号后 4 位
+- `loginCount` 从 1 开始，每次登录递增
+- 可在「我的」页面（`pages/userinfo/userinfo`）修改昵称与头像
+
+> 仓库中**不包含任何真实用户数据**，也不包含任何不可拨打的占位手机号 ——
+> 这比 Sprint 0 的做法更彻底：连种子账号都不需要。
+
+---
 
 ### 校验仓库完整性
 
 ```bash
-npm test              # JSON 语法校验（91 个文件）
-npm run test:auth     # auth-gateway 四道安全闸（26 项）
-npm run test:session  # session-audit 会话体检（18 项）
+# 根目录（前端 + 共享模块）
+npm test              # JSON 语法校验
 npm run test:agent    # Agent 编排层（53 项）
 npm run test:avatar   # 数字人交互层（15 项）
 npm run test:all      # 以上全部
 
-node scripts/check-workflow.js   # GitHub Actions workflow 校验
+# 后端（需先启动服务）
+cd server
+npm run test:api      # 后端接口与安全设计（39 项）
 ```
 
 > 全部测试零依赖，不引入 jest / mocha，clone 完即可运行。
+
+---
 
 ### 体验两个自研模块
 
@@ -238,38 +368,57 @@ uni-config-center (app-config plugin, 生产)
 openid、session_key、JWT token、真实 IP、昵称与头像 URL，以及真实的聊天记录、
 照片 URL、订单与打卡记录。
 
-**这些数据已全部移除**，替换为脱敏种子数据：
+**这些数据已全部移除**。Sprint 5 架构重构后更进一步 ——
+**整个 `uniCloud-aliyun/` 目录已删除**，改用本地 SQLite 数据库：
 
-| 文件 | 清理前 | 清理后 |
+| 表 | 清理前 | 现在 |
 |---|---|---|
-| `uni-id-users.json` | 11 条真实用户记录 | 1 条脱敏演示账号（CharLene） |
-| `ai-chat-history.json` | 3 条真实对话 | 2 条标注 `demo:true` 的演示种子 |
-| `user_photos.json` | 8 条真实照片记录 | 空数组 |
-| `userCheckedPlaces.json` | 33 条真实打卡记录 | 空数组 |
-| `user_orders.json` | 5 条真实订单 | 空数组 |
+| `users` | 11 条真实用户记录 | 空表，用任意手机号注册即自动创建 |
+| `chat_history` | 3 条真实对话 | 空表 |
+| `user_photos` | 8 条真实照片记录 | 空表 |
+| `check_in_places` | 33 条真实打卡记录 | 空表 |
+| `user_orders` | 5 条真实订单 | 空表 |
 
-所有种子数据**不含真实手机号、IP、openid、token、图片 URL**。
+数据库文件 `server/prisma/dev.db` 已被 `.gitignore` 排除，**永不进入版本库**。
+仓库中不含任何真实用户数据，也不含任何占位手机号。
 
-### 云端同步删除说明（重要）
+### 迁移自 uniCloud 的架构重构（Sprint 5）
 
-Sprint 0 在**本地**删除了 6 个云函数：
+起因是阿里云免费空间停止申请，原有 BaaS 后端无法继续使用。
+重构后**彻底切断 uniCloud 依赖**：
 
-```
-getTTSSignature
-check_feature_status
-checkinHandler
-getMapJson
-getUserOrders
-uni-id-pages（官方模块副本，与 uni_modules/ 下版本重复）
-```
+| 移除项 | 说明 |
+|---|---|
+| `uniCloud-aliyun/` 整个目录 | 21 个云函数 + 13 张表 + 公共模块 |
+| `uni_modules/uni-id-pages` | 官方登录页与用户中心（含内嵌 uni-id-co 云函数） |
+| `uni_modules/uni-id-common` | 官方 JWT/token 核心库 |
+| `uni_modules/uni-config-center` | 官方配置中心 |
+| `uni_modules/uni-captcha` | 官方图形验证码 |
+| `uni_modules/uni-cloud-s2s` / `uni-open-bridge-common` | 云通信模块 |
+| `uni_modules/uni-data-checkbox` / `uni-list` | 内部含 uniCloud 调用，前端零使用 |
+| `manifest.json` 的 `_spaceID` | 阿里云空间绑定信息 |
+| `.hbuilderx/launch.json` | uniCloud 调试配置 |
 
-> ⚠️ **仅删除本地文件是不够的。** HBuilderX 的「上传所有云函数」会先从云端拉取，
-> 因此这 6 个云函数**必须手动到 uniCloud 控制台删除**，否则下次上传会被拉回本地：
->
-> uniCloud 控制台 → 云函数空间 → 找到对应云函数 → 删除。
->
-> `uni-id-pages` 是官方模块的重复副本，删除本地副本后，
-> `uni_modules/uni-id-pages/` 下的官方版本仍会由 HBuilderX 正常同步部署。
+**保留**的 8 个 uni_modules（`uni-badge` / `uni-easyinput` / `uni-forms` /
+`uni-icons` / `uni-load-more` / `uni-popup` / `uni-scss` / `uni-transition`）
+经逐一核查**均为纯 UI 组件，零 uniCloud 依赖**，删除它们等于重写 UI。
+
+自研替代方案：
+
+| 原 uniCloud 能力 | 现在的自研实现 |
+|---|---|
+| `uni-id-co.loginBySms` | `server/src/routes/auth.js` + `utils/security.js` 四道安全闸 |
+| `uni-id-co.checkToken` | `server/src/middleware/auth.js`（JWT） |
+| `session-audit` 云函数 | `GET /api/user/session` |
+| `uniCloud.callFunction` | `utils/request.js` + `utils/auth.js` |
+| `uniCloud.uploadFile` | `POST /api/business/upload`（multer） |
+| 官方 `uniIdRouter` 守卫 | `utils/router-guard.js` |
+| 官方登录页 | `pages/login/login`（手写，视觉沿用原项目暖色系） |
+| 官方用户中心 | `pages/userinfo/userinfo`（手写） |
+| `ai-agent` 云函数 | `server/src/services/agent.js` + `routes/agent.js` |
+
+> **安全设计一条没丢**：CSPRNG 验证码、60 秒 + 单日 10 次频控、
+> 连错 5 次锁定、手机号严格类型校验、JWT 鉴权 —— 全部保留并有对应的单元测试。
 
 ---
 
@@ -281,50 +430,57 @@ uni-id-pages（官方模块副本，与 uni_modules/ 下版本重复）
 
 所有收费服务均为**可选适配器，默认关闭**。
 
+> 配置载体是标准的 `server/.env`（由 `dotenv` 加载）。
+> 模板见 [`server/.env.example`](./server/.env.example)。
+
 ### 能力开关表
 
 | 能力 | 当前实现 | 默认策略 | 免费替代路径 | 启用方式 |
 |---|---|---|---|---|
-| LLM 问答 | DeepSeek API（收费） | 🔴 **默认关闭** | 本地 `knowledge.json` 检索 + 规则回答（零依赖） | `app-config.deepseek._enabled = true` + 填 `apiKey` |
-| LLM 意图分类 | DeepSeek API（收费） | 🔴 **默认关闭** | `rule-adapter` 关键词加权分类 | `app-config.deepseek._enabled = true` + 显式传入 `llmAdapter` |
-| TTS 语音 | 讯飞 WebSocket（收费） | 🔴 **默认关闭** | 纯口型动画 + 打字机（无音频也能演示） | `app-config.xfyun._enabled = true` + 填 3 项凭据 |
-| 图片识图 | 百度智能云（收费） | 🔴 **默认关闭** | 手动输入食材名，走本地规则 | `app-config.baidu._enabled = true` + 填 2 项凭据 |
-| 对象存储 | 腾讯云 COS（收费） | 🔴 **默认关闭** | 改用 uniCloud 云存储（免费额度内） | `app-config.cos._enabled = true` + 填 3 项凭据 |
-| 微信登录 | 微信 appsecret | 🟡 **可选** | 手机号验证码为主路径 | `uni-id/config.json` 填 `mp-weixin.oauth.weixin.*` |
-| 一键登录 | uni-verify | 🟡 **可选** | 同上 | `uni-id/config.json` 填 `service.univerify.*` |
-| 短信验证码 | 阿里云短信 | 🟡 **可选** | `auth-gateway` 的 `dev.simulateSms`（仅开发） | `uni-id/config.json` 填 `service.sms.*` |
+| 账号体系 | 自研 JWT（jsonwebtoken） | 🟢 **默认可用** | — | 无需配置 |
+| 数据库 | 本地 SQLite + Prisma | 🟢 **默认可用** | — | `npx prisma db push` 一次即可 |
+| 验证码下发 | 开发模式直接返回 `devCode` | 🟢 **默认可用** | — | `DEV_MODE=true` |
+| 真实短信 | 阿里云短信（收费） | 🟡 **可选** | 开发模式 `devCode` | 接入短信服务商 SDK |
+| LLM 问答 | DeepSeek API（收费） | 🔴 **默认关闭** | 本地 `knowledge.json` 检索 + 规则回答（零依赖） | `DEEPSEEK_ENABLED=true` + 填 `DEEPSEEK_API_KEY` |
+| LLM 意图分类 | DeepSeek API（收费） | 🔴 **默认关闭** | `rule-adapter` 关键词加权分类 | 同上 + 显式传入 `llmAdapter` |
+| TTS 语音 | 讯飞 WebSocket（收费） | 🔴 **默认关闭** | 纯口型动画 + 打字机（无音频也能演示） | `XFYUN_ENABLED=true` + 填 3 项凭据 |
+| 图片识图 | 百度智能云（收费） | 🔴 **默认关闭** | 手动输入食材名，走本地规则 | `BAIDU_ENABLED=true` + 填 2 项凭据 |
+| 文件存储 | 本地磁盘（multer） | 🟢 **默认可用** | — | 无需配置 |
 | Agent 编排 | 规则适配器（自研） | 🟢 **默认可用** | — | 无需配置 |
 | 数字人渲染 | Canvas 2D（自研） | 🟢 **默认可用** | — | 无需配置 |
-| 会话健康检查 | `session-audit`（自研） | 🟢 **默认可用** | — | 无需配置 |
+| 会话健康检查 | `/api/user/session`（自研） | 🟢 **默认可用** | — | 无需配置 |
 
-> 详细的获取方式、配置位置与逐项说明，见 [`config.example.json`](./config.example.json)。
+> 详细的获取方式与配置位置，见 [`server/.env.example`](./server/.env.example)。
 
 ### 开发期开关
 
-```jsonc
-// uniCloud-aliyun/cloudfunctions/common/app-config/config.json
-{
-  "dev": {
-    "simulateSms": false,   // 🔴 生产必须 false
-    "smsScene": "login-by-sms"
-  }
-}
+```bash
+# server/.env
+DEV_MODE=true          # 🔴 生产必须 false
 ```
 
-开启 `dev.simulateSms` 后，`auth-gateway` 不真实下发短信，
-验证码写入云函数日志并在响应的 `devCode` 字段中返回，便于无短信服务商的本地自测。
+开启 `DEV_MODE` 后，`POST /api/auth/send-code` 不真实下发短信，
+验证码写入后端日志并在响应的 `devCode` 字段中返回，便于无短信服务商时的本地自测。
 
-> 🔴 **生产环境必须为 `false`**，否则验证码会直接暴露在接口响应里。
+> 🔴 **生产环境必须为 `false`**，否则验证码会直接暴露在接口响应里，
+> 等同于绕过短信验证。
 
-### 必须手动配置的两项（非外部收费服务，但生产必需）
+### 必须手动配置的一项（生产必需）
 
-```jsonc
-// uni_modules/uni-config-center/uniCloud/cloudfunctions/common/uni-config-center/uni-id/config.json
-{
-  "tokenSecret": "your-token-secret-placeholder",        // ← 必须替换，JWT 签名密钥
-  "requestAuthSecret": "your-request-auth-secret-placeholder" // ← 必须替换，请求签名密钥
-}
+```bash
+# server/.env
+JWT_SECRET=<高强度随机串>   # ← 必须替换，JWT 签名密钥
 ```
+
+生成方式：
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+> 🔴 **不替换则任何人都能伪造登录 token。**
+> `server/.env` 已被 `.gitignore` 排除，不会进入版本库。
+> `server/.env.example` 中的占位符仅供说明，不可用于生产。```
 
 这两项若不替换，示例值 `tokenSecret-demo` 会被沿用，**任何人都能伪造登录 token**。
 
@@ -340,8 +496,8 @@ uni-id-pages（官方模块副本，与 uni_modules/ 下版本重复）
 |---|---|---|---|
 | 1 | **APK 未实际打包** | ⬜ 未执行 | 无 DCloud 账号与打包凭据，且本地无 HBuilderX CLI。`build-apk.yml` 结构正确、YAML 校验通过，但**未在真实环境跑通**，不产出 APK |
 | 2 | **真机安装未验证** | ⬜ 未执行 | 无 Android 真机环境。「Android 10+ 安装不闪退」是待验证项，不是已验证结论 |
-| 3 | **真实短信未发送** | ⬜ 未执行 | 阿里云短信未配置（`smsKey` 为占位符）。`auth-gateway` 的发送逻辑经 mock 验证，真实链路未跑通 |
-| 4 | **生产云空间未部署** | ⬜ 未执行 | `manifest.json` 的 `_spaceID` 指向开发空间 |
+| 3 | **真实短信未发送** | ⬜ 未执行 | 短信服务商未接入。`send-code` 的完整逻辑经 39 项后端测试验证（含频控、锁定），但**真实短信链路未跑通** |
+| 4 | **前端未在 HBuilderX 中实际运行** | ⬜ 未执行 | 44 处 API 调用已全部替换并通过静态语法校验，但**未在 HBuilderX 模拟器/真机中点过一遍**。真机调试还需把 `BASE_URL` 改为局域网 IP |
 | 5 | **git 未 push** | ⬜ 未执行 | 仓库无 remote，按约定不自行添加 |
 | 6 | **Canvas 渲染未在真机/模拟器验证** | ⬜ 未执行 | 渲染逻辑有单元测试覆盖（参数裁剪、表情切换、无 ctx 不抛异常），但实际画面效果需在 HBuilderX 中运行确认 |
 
@@ -351,26 +507,27 @@ uni-id-pages（官方模块副本，与 uni_modules/ 下版本重复）
 |---|---|---|---|
 | 7 | **口型映射是近似的** | 不是音素级对齐。刻意不引入拼音库（会增数百 KB 依赖），用字符类别近似替代 | 见 Future Work |
 | 8 | **`analyzeAudio` 接口未实现** | 音频驱动的口型同步不可用。需 Web Audio AnalyserNode，且 App 端与 H5 端 API 不一致 | 见 Future Work |
-| 9 | **`ai-chat-history` 是覆盖写** | 每用户只存最后一条，不是真正的历史记录 | Sprint 2 遗留，见 Future Work |
+| 9 | **`chat_history` 是覆盖写** | 每用户只存最后一条，不是真正的历史记录 | 见 Future Work |
 | 10 | **TTS 默认 noop** | 数字人默认不出声，只有口型动画。启用需配置讯飞 | 见 Future Work |
 | 11 | **Agent 默认规则适配器** | 意图识别基于关键词加权，换一种问法可能识别不到 | 见 Future Work（LLM 适配器） |
-| 12 | **Agent 编排层运行在前端** | 云函数无法 require 项目根的 `agent/`（HBuilderX 只打包 `cloudfunctions/<name>/`），故云端能力需通过工具调用接入 | 架构约束，见 agent/README.md |
+| 12 | **业务数据接口按 name 聚合** | `/api/business/:name` 而非每域一个路由文件。优点是前端改动最小、协议替换纯粹；缺点是单文件较长 | 刻意选择，见 Architecture |
 | 13 | **数字人形象为简笔风格** | 目标是链路自研可讲，不追求视觉精美 | — |
-| 14 | **知识库同义问法用 `\|\|` 拼接** | 可维护性差 | 见 Future Work |
-| 15 | **组件中硬编码 COS 域名** | 多环境切换需改多处 | 见 Future Work |
-| 16 | **Android 存储权限用 `READ/WRITE_EXTERNAL_STORAGE`** | Android 13+ 已废弃该模式，需迁移到 `READ_MEDIA_IMAGES` | 打包上架前处理 |
+| 14 | **知识库同义问法用双竖线拼接** | 可维护性差 | 见 Future Work |
+| 15 | **图片识别降级为本地规则** | 未接百度 AI 时只返回「未识别」与说明文字 | 见 Future Work |
+| 16 | **SQLite 单机存储** | 不适合多实例部署与高并发。生产环境建议换 PostgreSQL（Prisma 改一行 datasource 即可迁移） | 见 Future Work |
+| 17 | **文件上传存本地磁盘** | 多实例部署时图片不共享。生产建议换对象存储 | 见 Future Work |
+| 18 | **Android 存储权限用 READ/WRITE_EXTERNAL_STORAGE** | Android 13+ 已废弃该模式，需迁移到 `READ_MEDIA_IMAGES` | 打包上架前处理 |
 
 ### 🟢 环境相关的注意事项
 
 | # | 项目 | 说明 |
 |---|---|---|
-| 17 | `tokenSecret` / `requestAuthSecret` 现为占位符 | **部署前必须替换**，否则 JWT 可被伪造。示例值生成方法见 Production Deployment |
-| 18 | 云端 6 个已删云函数需手动删除 | 否则「上传所有云函数」会从云端拉回本地，清单见 Security 章节 |
-| 19 | `manifest.json` 的 `_spaceID` 指向开发空间 | 切换生产空间后该字段会被 HBuilderX 改写，提交前注意排除 |
-| 20 | 演示账号 `mobile` 为不可拨占位符 | `189****2619` 不是真实号码；实际登录用任意手机号走验证码流程即可自动创建用户 |
+| 19 | `server/.env` 的 `JWT_SECRET` 现为占位符 | **部署前必须替换**，否则 JWT 可被伪造。生成方法见 Production Deployment |
+| 20 | `server/.env` 的 `DEV_MODE` 现为 true | **生产必须改为 false**，否则验证码直接出现在接口响应里 |
+| 21 | 真机调试需改 `BASE_URL` | `http://localhost:3000` 在手机上指向手机自身，需改为电脑局域网 IP |
+| 22 | 旧 uniCloud 资源仍在云端 | 若之前关联过阿里云空间，那些云函数仍存在，但**本项目已不再使用**，可自行在控制台清理 |
 
 ---
-
 ## Features
 
 按模块列出，标注完成状态。
@@ -390,21 +547,25 @@ uni-id-pages（官方模块副本，与 uni_modules/ 下版本重复）
 | 我的 | 点赞、相册、打卡记录、账户资料、关于 | ✅ |
 | 每日签到 | 签到积分、连续签到统计 | ✅ |
 
-### 🔐 账户与安全（Sprint 1 新增/增强）
+### 🔐 账户与安全（Sprint 1 设计 + Sprint 5 重建）
 
 | 功能 | 说明 | 状态 |
 |---|---|---|
-| 手机号验证码登录 | 统一入口 `auth-gateway`，四道安全闸 | ✅ |
-| CSPRNG 验证码 | `crypto.randomInt`，替代 `Math.random()` | ✅ |
+| 手机号验证码登录 | `POST /api/auth/send-code` + `/api/auth/login`，用户不存在自动注册 | ✅ |
+| 手写登录页 | `pages/login/login`，视觉沿用原项目暖色系 | ✅ Sprint 5 |
+| 手写用户中心 | `pages/userinfo/userinfo`，含昵称/头像编辑与登录统计 | ✅ Sprint 5 |
+| JWT 鉴权 | `jsonwebtoken` HS256，7 天有效期，中间件统一拦截 | ✅ Sprint 5 |
+| CSPRNG 验证码 | `crypto.randomInt`，替代 `Math.random` | ✅ |
 | 发送频率限制 | 同号 60 秒一次 + 单日 10 次上限 | ✅ |
 | 错误次数锁定 | 连错 5 次验证码作废，需重新获取 | ✅ |
-| 手机号严格校验 | 拒绝数组/数字/null 等异常入参 | ✅ |
-| 会话健康检查 | `session-audit` 返回有效期/设备数/登录地 | ✅ |
+| 手机号严格类型校验 | 拒绝数组/数字/null 等异常入参 | ✅ |
+| bcrypt 密码哈希 | 密码登录路径 | ✅ Sprint 5 |
+| 会话健康检查 | `GET /api/user/session`，返回有效期/即将过期/设备数/登录地 | ✅ |
 | 静默续期 | 剩余 < 600s 自动刷新，用户无感知 | ✅ |
-| 路由守卫 | `uniIdRouter.needLogin` 保护 6 个页面 | ✅ |
-| 登录统计字段 | `login_count` / `last_login_at` / `source` | ✅ |
+| 路由守卫 | 自研 `utils/router-guard.js`，5 个受保护页面 | ✅ Sprint 5 |
+| 登录统计字段 | `loginCount` / `lastLoginAt` / `source` | ✅ |
 
-### 🤖 Agent 编排层（Sprint 2 新增）
+### 🤖 Agent 编排层（Sprint 2 设计 + Sprint 5 迁至服务端）
 
 | 功能 | 说明 | 状态 |
 |---|---|---|
@@ -415,8 +576,9 @@ uni-id-pages（官方模块副本，与 uni_modules/ 下版本重复）
 | 可观测 | 每次调用生成 trace，环形缓冲保留 20 条 | ✅ |
 | 短期记忆 | 滑动窗口，可选持久化 | ✅ |
 | 规则适配器 | 默认路径，零外部依赖 | ✅ |
-| LLM 适配器 | 可选启用，需配置 API Key | ✅（可选） |
+| LLM 适配器 | 可选启用，需配置 Key | ✅（可选） |
 | Agent 演示页 | 输入 → 规划 → 执行 → trace 查看 | ✅ |
+| **服务端编排** | Sprint 5：后端可直接 require `agent/` 核心，编排与数据同处一地 | ✅ Sprint 5 |
 
 ### 🎭 数字人交互层（Sprint 3 新增）
 
@@ -434,14 +596,14 @@ uni-id-pages（官方模块副本，与 uni_modules/ 下版本重复）
 
 | 功能 | 说明 | 状态 |
 |---|---|---|
-| 零配置可运行 | clone 即跑，零外部 API 费用 | ✅ |
-| 密钥收敛 | 源码零凭据，统一经 `app-config` 读取 | ✅ |
-| 自动化测试 | 121 项（26+18+53+15+9 校验） | ✅ |
+| **零付费云依赖** | 不需要注册任何云账号，本地完整跑通 | ✅ Sprint 5 |
+| **零配置可运行** | clone → npm install → prisma db push → npm run dev | ✅ Sprint 5 |
+| 密钥治理 | 全部经 `server/.env`，源码零凭据 | ✅ |
+| 自动化测试 | 前后端共 107 项（JSON + 53 Agent + 15 数字人 + 39 后端） | ✅ |
 | CI 工作流 | push tag 自动构建，产出 artifact | ✅（需配置 secrets） |
 | 上线文档 | 五阶段流程 + 检查清单 | ✅ |
 
 ---
-
 ## Technical Highlights
 
 > 每个亮点用「问题 — 机制 — 结果」三段式写。
@@ -481,44 +643,44 @@ uni-id-pages（官方模块副本，与 uni_modules/ 下版本重复）
 
 ---
 
-### 亮点 2 · 会话健康检查层
+### 亮点 2 · 换后端不丢一项安全设计
 
 **问题**
-uni-id 只有 `tokenExpiresThreshold` 触发的**被动**自动刷新，
-且仅在 `checkToken` 被调用时才生效。这导致两类真实的用户失败：
-
-- **冷启动场景** —— App 被系统回收后重新拉起，token 可能已过期，
-  但界面无感知，用户填完表单点「打卡」才发现失败
-- **关键操作场景** —— token 在用户停留期间过期，写操作中途失败，前面的输入全部作废
-
-问题的本质是：**系统知道 token 快过期了，但没人去问。**
+Sprint 5 要把后端从 uniCloud 换成自建 Express 服务。
+这类「换后端」的重构最容易出的事故，是**顺手把安全机制一起丢掉**：
+验证码能无限试、频控没了、token 不校验了 —— 功能都跑得通，但安全性悄悄退化了。
+更隐蔽的是：官方 `uni-id` 的那些防护是**隐式**的，
+开发者以为「用了 uni-id 就等于有防护」，实际上一旦自研登录，这些防护全部消失。
 
 **机制**
-自研 `cloudfunctions/session-audit/` + `utils/session.js`：
+把 Sprint 1 设计的四道安全闸**逐条翻译**到新后端，并写进契约测试：
 
-- **云函数侧**（纯读，无任何写操作）：
-  解析 token payload 计算剩余有效期，标记 `expiresSoon`（阈值 600s），
-  附带 `deviceCount`（基于 `uni-id-users.token` 数组长度）
-  与 `lastLoginIpMasked`（IP 前两段掩码）
-- **前端侧**：冷启动（`App.onLaunch`）与关键操作前调用，
-  按返回值决策：
+| 安全设计 | uniCloud 时代 | Express 时代 | 落地位置 |
+|---|---|---|---|
+| ① 手机号严格校验 | uni-id 的 `mobile` schema（隐式） | **显式** `typeof === 'string'` + 正则 | `server/src/utils/security.js` |
+| ② CSPRNG 验证码 | ❌ 用的是 `Math.random()`（不安全） | ✅ `crypto.randomInt` | 同上 |
+| ③ 发送频控 | ❌ 无 | ✅ 60 秒 + 单日 10 次 | 同上（`verify_codes` 表字段） |
+| ④ 错误次数锁定 | ❌ 无 | ✅ 5 次作废 | 同上（`attempts` 字段） |
+| ⑤ Token 鉴权 | uni-id-co 的 `checkToken`（隐式） | **显式** JWT 中间件 | `server/src/middleware/auth.js` |
+| ⑥ 会话健康检查 | 自研 `session-audit` 云函数 | 改为 `GET /api/user/session` | `server/src/routes/user.js` |
 
-| 条件 | 动作 | 用户感知 |
-|---|---|---|
-| 剩余 > 600s | 直接放行 | 无 |
-| 剩余 ≤ 600s | 静默刷新 token | 无 |
-| token 已失效 | 强制重新登录 | 跳登录页 |
-| 审计服务不可用 | **保守放行** | 无 |
-
-最后一条是刻意设计的：可用性优先，安全性由后端兜底。
-审计服务挂掉不该让整个 App 不能用。
+关键决策是**把隐式防护变成显式契约**：
+每一项都有对应的断言与测试用例，而不是"框架应该会处理"。
 
 **结果**
-- 冷启动即完成会话体检，过期 token 在用户操作前就被处理
-- 静默续期路径已实现并通过单元测试（`utils/session.js` 的决策分支）
-- 边界明确：**不做地理位置解析、不做威胁检测、不做任何写操作** ——
-  session-audit 是纯读函数，审计本身不会影响会话状态
-- `valid: false` 时前端强制跳登录，避免关键操作静默失败
+- 后端 **39 项契约测试全绿**，逐条断言上述 6 项安全设计
+- 7 种异常手机号入参（数组/数字/null/undefined/对象/布尔/格式错）
+  全部返回结构化错误，**零未捕获异常**
+- 60 秒内二次发送返回 **429 + `auth-sms-too-frequent` + `retryAfter`**
+- 连错 5 次后**即使提交正确验证码也无法登录**（已实测）
+- 不带 token / 伪造 token 一律 **401**，带 token 正常返回
+- 用户资料接口**无法篡改 `loginCount`** 等服务端维护的字段
+  （传了返回 `user-nothing-to-update`）
+- 前端请求层同步提供**兜底**：`utils/request.js` 拦截 401 后
+  自动清除本地凭证并跳转登录页，替代了原来的 session-audit 职责
+
+> 这条亮点的价值不在于"做了安全功能"，而在于**证明重构没有引入安全退化** ——
+> 而这正是架构迁移类工作中最容易被忽略、也最容易被面试官追问的部分。
 
 ---
 
@@ -540,28 +702,19 @@ uni-id 只有 `tokenExpiresThreshold` 触发的**被动**自动刷新，
 
 **② AvatarController**（`controller/avatar-controller.js`）—— 打断语义
 `speak` / `stop` / `setExpression` 三方法，`requestAnimationFrame` 驱动播放循环。
-打断语义采用**覆盖式**（新 speak 打断旧的，不排队）：
-数字人是对话反馈，用户再次说话意味着他不想听上一句；
-排队会导致「我问三句，它慢慢答三句」的滞后感。需要排队时可传 `queue: true`。
+覆盖式打断（新的 `speak` 打断旧的），`stop()` 立即取消 rAF 并复位口型。
 
 **③ Agent 联动**（`agent/tools/avatar-speak.js`）
 把数字人封装成 Agent 工具，executor 调用即触发口播。
-该工具**仅在前端注册** —— AvatarController 依赖 rAF 与 Canvas 上下文，
-云端不存在这个能力。
 
 **结果**
-- 口型序列单元测试 **15 项全绿**：长度匹配、值域 [0,1]、t 单调递增、标点闭合、插值边界
+- 口型序列单元测试 **15 项全绿**：序列长度匹配、value 值域 [0,1]、t 单调递增、标点闭合、插值边界
 - `stop()` 立即复位口型为 0 并取消 rAF（已断言）
 - 连续 `speak()` 三次，**仅保留一条 rAF 链**，无双动画（已断言）
 - Agent 执行 `avatar-speak` 工具后，数字人随即开口（已断言）
 - **精度边界如实声明**：口型映射是近似的，不是音素级对齐。
   不做真实拼音转换是刻意的取舍 —— 完整拼音库会增加数百 KB 依赖，
   与「clone 即可运行、零外部依赖」的约束冲突
-
-> 开发过程中此处修复了一个真实缺陷：`_interrupt()` 直接改 `this.speaking`，
-> 导致后续 `_setState(false)` 因值未变而提前返回，
-> `onStateChange` 回调收不到 `speaking=false`。已重构为
-> `_interrupt` 只清内部资源、对外状态统一由 `_setState` 维护。
 
 ---
 
@@ -573,7 +726,7 @@ uni-id 只有 `tokenExpiresThreshold` 触发的**被动**自动刷新，
 改了就无法跟随官方升级，官方修 bug 时会产生冲突，审计时也说不清"哪些是自研"。
 
 **机制**
-用 `auth-gateway` 做**外层薄包装**：
+Sprint 1 用 `auth-gateway` 做**外层薄包装**：
 
 ```
 客户端 → auth-gateway → 四道安全闸 → uni-id-co → 云数据库
@@ -591,85 +744,73 @@ uni-id 只有 `tokenExpiresThreshold` 触发的**被动**自动刷新，
 - 官方升级时只需重新比对基线，不存在合并冲突
 - Sprint 1 结束时 `auth-gateway` 主文件 42 行，远低于 150 行的设计上限
 
----
+> Sprint 5 彻底移除 uniCloud 后，这套「不改第三方源码」的原则延续到了新后端：
+> Express、Prisma、jsonwebtoken 全部以标准方式使用，不 fork、不魔改。
 
+---
 ## Database Schema
 
-### `uni-id-users`（账户表）
+> 数据库：**SQLite**（本地文件 `server/prisma/dev.db`），ORM：**Prisma**。
+> Schema 定义见 [`server/prisma/schema.prisma`](./server/prisma/schema.prisma)。
+> 数据库文件已被 `.gitignore` 排除，永不进入版本库。
+
+### `users`（用户表）
 
 | 字段 | 类型 | 说明 |
 |---|---|---|
-| `_id` | ObjectId | 用户 ID |
-| `mobile` | string | 手机号（**字符串类型**，非 number/array） |
-| `email` | string | 邮箱 |
-| `nickname` | string | 昵称 |
-| `password` | string\|null | 密码哈希；手机号验证码登录的账号为 `null` |
-| `status` | int | 0 正常 / 1 封禁 / 2 审核中 / 3 审核失败 / 4 已注销 |
-| `token` | string[] | 有效 token 数组，**长度即登录设备数** |
-| `register_date` | timestamp | 注册时间 |
-| `last_login_date` | timestamp | 最近登录时间 |
-| `last_login_ip` | string | 最近登录 IP（`session-audit` 会做掩码输出） |
-| `login_count` | int | **自研扩展**：累计登录次数 |
-| `last_login_at` | timestamp | **自研扩展**：最近登录时间戳 |
-| `source` | string | **自研扩展**：注册来源（如 `sms` / `demo-seed`） |
-| `points` / `score` | int | 积分与评分 |
-| `signin_date` / `signin_days` | string / int | 签到状态 |
-| `avatar_file` | object | 头像文件信息 |
+| `id` | Int | 主键，自增 |
+| `mobile` | String (unique) | 手机号，登录主键 |
+| `nickname` | String? | 昵称 |
+| `avatar` | String? | 头像 URL |
+| `password` | String? | bcrypt 哈希；验证码登录的账号为 null |
+| `email` | String? | 邮箱 |
+| `loginCount` | Int | **累计登录次数**，每次登录 +1 |
+| `lastLoginAt` | DateTime? | **最近登录时间** |
+| `lastLoginIp` | String? | 最近登录 IP（输出时掩码） |
+| `registerDate` | DateTime | 注册时间 |
+| `source` | String | **注册来源**（sms / register） |
+| `points` / `score` | Int | 积分 / 评分 |
+| `signinDate` / `signinDays` | String / Int | 签到状态 |
 
-### `opendb-verify-codes`（验证码表）
+> `loginCount` / `lastLoginAt` / `source` 是 Sprint 1 设计的扩展字段，
+> 在 SQLite 时代原样保留，并已通过实测验证落库。
 
-| 字段 | 类型 | 说明 |
-|---|---|---|
-| `_id` | ObjectId | 记录 ID |
-| `mobile` | string | 手机号 |
-| `scene` | string | 场景（`login-by-sms` 等） |
-| `code` | string | 6 位验证码（**由 `crypto.randomInt` 生成**） |
-| `state` | int | **0 未验证 / 1 已验证 / 2 已作废** |
-| `attempts` | int | **自研扩展**：已错误次数，≥5 时置 `state=2` |
-| `create_date` | timestamp | 创建时间 |
-| `expired_date` | timestamp | 过期时间（默认 240s） |
-| `ip` | string | 请求 IP |
-
-> `state=2`（已作废）是 uni-id **原本就定义**的语义，
-> 自研的锁定逻辑直接复用，无需修改官方 schema。
-
-### `auth-sms-rate-limit`（频控表，自研新增）
+### `verify_codes`（验证码表）
 
 | 字段 | 类型 | 说明 |
 |---|---|---|
-| `_id` | string | 主键，格式 `login-by-sms_<手机号>` |
-| `mobile` | string | 手机号 |
-| `scene` | string | 场景 |
-| `lastSendAt` | number | 上次发送时间戳（毫秒），用于 60 秒间隔判定 |
-| `day` | string | 日期分桶键（`YYYY-MM-DD`），用于跨日重置 |
-| `dayCount` | int | 当日已发送次数，≥10 时拒绝 |
+| `id` | Int | 主键 |
+| `mobile` | String | 手机号 |
+| `scene` | String | 场景（login / register / bind） |
+| `code` | String | 6 位验证码（**crypto.randomInt 生成**） |
+| `attempts` | Int | **已错误次数**，达到上限即作废 |
+| `maxAttempts` | Int | 最大允许错误次数（默认 5） |
+| `expireAt` | DateTime | 过期时间（240 秒） |
+| `used` | Boolean | 是否已使用（作废时置 true） |
+| `lastSendAt` | DateTime? | **上次发送时间**（60 秒频控判定） |
+| `dayCount` | Int | **当日已发送次数**（单日上限 10） |
+| `day` | String? | 日期分桶键（YYYY-MM-DD），跨日自动重置 |
+| `ip` | String? | 请求 IP |
 
-### `ai-chat-history`（聊天记录）
+> 设计说明：验证码与频控计数**放在同一条记录上**。
+> 每次发送创建新记录（旧记录自然过期），
+> 频控字段只记录在最新一条上 —— 避免了「频控表」与「验证码表」两张表的关联与同步问题。
 
-| 字段 | 类型 | 说明 |
-|---|---|---|
-| `_id` | string | 记录 ID |
-| `user_id` | ObjectId | 用户 ID |
-| `last_question` | string | 最近一次提问 |
-| `last_answer` | string | 最近一次回答 |
-| `updated_at` | number | 更新时间戳 |
-
-> ⚠️ **已知限制**：该表当前是**覆盖写**（`.doc(uid).set()`），
-> 每用户仅保留最后一条，不是真正的历史记录。见 Known Issues。
-
-### 其他表
+### 业务表
 
 | 表 | 用途 |
 |---|---|
+| `check_in_places` | 打卡地点记录 |
 | `user_photos` | 用户打卡照片 |
 | `user_orders` | 商城订单 |
-| `userCheckedPlaces` | 打卡地点记录 |
-| `quiz_questions` | 答题题库（种子数据） |
-| `shop_goods` | 商城商品（种子数据） |
-| `init_food_data` | 美食基础数据（种子数据） |
+| `chat_history` | 聊天记录（每用户一条，与原实现一致） |
+| `shop_goods` | 商城商品 |
+| `quiz_questions` | 答题题库 |
+| `villages` | 村庄信息 |
+| `foods` | 美食信息 |
 
-> Agent 的 trace **仅存于内存环形缓冲区**，不落库 ——
-> trace 是调试用的短期数据，落库会带来额外的隐私与清理成本。
+共 10 张表。Agent 的 trace **仅存于内存环形缓冲区**，不落库 ——
+trace 是调试用的短期数据，落库会带来额外的隐私与清理成本。
 
 ---
 
@@ -696,16 +837,34 @@ uni-id 只有 `tokenExpiresThreshold` 触发的**被动**自动刷新，
 | PB-15 | AI 回答时数字人自动播报 | P1 | S3 | ✅ |
 | PB-16 | 能在 CI 中自动产出 APK | P1 | S4 | ✅ |
 | PB-17 | 有一份可执行的上线流程 | P0 | S4 | ✅ |
+| PB-18 | **不依赖任何付费云服务，本地可完整跑通** | P0 | S5 | ✅ |
+| PB-19 | **后端是标准的 HTTP 服务，前后端彻底分离** | P0 | S5 | ✅ |
+| PB-20 | **换后端不丢任何一项安全设计** | P0 | S5 | ✅ |
 
 ### Sprint 划分与增量
 
 | Sprint | 主题 | 交付的增量 | 提交 |
 |---|---|---|---|
 | **Sprint 0** | 技术债清理与仓库工程化 | 30 项技术债盘点，P0 全 12 项关闭；6 个死代码云函数删除；真实用户数据脱敏；7 组密钥外移；`.gitignore`/`LICENSE`/`README`/`docs/` 落地 | `13703d6` |
-| **Sprint 1** | 登录与账户持久化 | `auth-gateway` 四道安全闸；`session-audit` 会话体检；`utils/session.js` 静默续期。26+18 项验证全绿 | `bbe4d01` |
+| **Sprint 1** | 登录与账户持久化 | `auth-gateway` 四道安全闸；`session-audit` 会话体检；`utils/session.js` 静默续期 | `bbe4d01` |
 | **Sprint 2** | Agent 编排层 | `agent/` 完整目录（planner/executor/memory/fallback/trace/工具注册表/双适配器）；53 项单测；Agent 演示页 | `989d89d` |
 | **Sprint 3** | 数字人交互层 | `digital-avatar/` 完整目录（Canvas 2D 渲染器/口型桥接/控制器/TTS 适配器）；15 项单测；`avatar-speak` 工具打通 Agent 联动 | `08e2ed1` |
-| **Sprint 4** | 打包配置与上线文档 | Android 权限收敛；`build-apk.yml` CI；README 15 章补全；五阶段上线手册 | 本次提交 |
+| **Sprint 4** | 打包配置与上线文档 | Android 权限收敛；`build-apk.yml` CI；README 补全；五阶段上线手册 | `256aa09` |
+| **Sprint 5** | **脱离 uniCloud + 搭建真实 HTTP 后端** | **`server/` 独立后端工程（Express + Prisma + SQLite）；44 处 uniCloud 调用全部替换；手写登录页与用户中心；自研路由守卫；Agent 编排迁至服务端** | 本次提交 |
+
+### Sprint 5 的架构重构决策
+
+起因是**阿里云免费空间停止申请**，原有 BaaS 后端无法继续使用。
+这次重构不是「换个技术栈」，而是**一次彻底的后端重写**，但刻意控制了风险：
+
+| 决策 | 选择 | 理由 |
+|---|---|---|
+| 后端形态 | 独立 Node.js/Express 服务 | 前后端分离是当前主流，也让后端可被任何 Node 环境托管 |
+| 数据库 | SQLite + Prisma | 零配置零成本，「文件即数据库」；Prisma 换 PostgreSQL 只改一行 |
+| 业务接口形态 | `/api/business/:name` 聚合路由 | **name 与原云函数同名** → 前端只需改调用方式，数据结构与 UI 完全不动 |
+| 登录体系 | 自研 JWT + 手写登录页 | 官方 uni-id-pages 依赖 uniCloud，无法保留 |
+| Agent 编排位置 | **从前端搬到服务端** | 后端可直接 require `agent/` 核心（Sprint 2 的约束消失了），且能直接查库 |
+| 前端 UI | **完全不改结构** | 只替换 API 调用层，18 个业务页面的 UI 一行未动 |
 
 ### 每个 Sprint 的完成标准
 
@@ -718,186 +877,191 @@ uni-id 只有 `tokenExpiresThreshold` 触发的**被动**自动刷新，
 | S2 | 53/53 · 四个指定输入分别产出单工具/单工具/双工具/降级 | ✅ |
 | S3 | 15/15 · 口型长度/值域/单调三项性质 · stop 复位 · 覆盖无双动画 | ✅ |
 | S4 | JSON 91 个全绿 · workflow YAML 校验通过 · README 全部章节有实质内容 | ✅ |
+| S5 | 后端 39/39 · 全仓库 uniCloud 零残留 · 44 处调用替换 · 数据实测落库 · Agent 四场景实测 | ✅ |
 
 ### 全程守住的边界
 
 | 边界 | 验证方式 | 结果 |
 |---|---|---|
-| 不修改 `uni-id-co` 源码 | 每个 Sprint 结束时 sha256 基线比对 | ✅ 零改动 |
-| 不修改 `uni_modules/` 官方模块 | 全量哈希比对 | ✅ 仅 `uni-id/config.json`（配置层）变更 |
-| 不引入付费依赖作为默认路径 | `app-config.isServiceEnabled()` 判定 | ✅ 全部默认关闭 |
-| 不声称未执行的操作 | README / 提交信息逐项核对 | ✅ 见 Known Issues |
+| 不修改 `uni-id-co` 源码 | 每个 Sprint 结束时 sha256 基线比对 | ✅ S0–S4 零改动，S5 整体删除 |
+| 不修改 `uni_modules/` 官方模块 | 全量哈希比对 | ✅ S0–S4 仅配置层变更，S5 只删云依赖模块 |
+| 不引入付费依赖作为默认路径 | `isServiceEnabled()` 判定 | ✅ 全部默认关闭 |
+| **不声称未执行的操作** | README / 提交信息逐项核对 | ✅ 见 Known Issues |
+| **Sprint 5 不改前端 UI 结构** | 只替换 API 调用层 | ✅ 18 个业务页面 UI 未动 |
+| **Sprint 5 不删非计划内文件** | 每次删除前做备份目录 diff | ✅ 精确核对 |
 
 ---
-
 ## API Documentation
 
-### 1 · `auth-gateway`（登录统一入口）
+后端基址：`http://localhost:3000`
+所有接口返回 JSON，统一结构：`{ code, errCode?, errMsg?, ... }`
+认证方式：`Authorization: Bearer <token>`（`/api/auth/*` 除外）
 
-#### `sendSmsCode` —— 发送短信验证码
+### 1 · `POST /api/auth/send-code` —— 发送验证码
 
 ```jsonc
 // 请求
-{ "action": "sendSmsCode", "mobile": "13800138000" }
+{ "mobile": "13800138000", "scene": "login" }
 
-// 响应（成功）
+// 响应（开发模式）
 {
   "code": 200,
-  "message": "验证码已发送",
+  "message": "验证码已生成（开发模式）",
+  "devCode": "964729",     // 仅 DEV_MODE=true 时返回
   "expiresIn": 240
 }
+```
 
-// 响应（60 秒内重复发送）
-{
-  "code": 400,
-  "errCode": "auth-sms-too-frequent",
-  "errMsg": "发送过于频繁，请 42 秒后重试",
-  "retryAfter": 42
-}
+**错误码**：
 
-// 响应（手机号类型非法）
+| HTTP | errCode | 含义 |
+|---|---|---|
+| 400 | `auth-invalid-mobile-type` | 手机号不是字符串（数组/数字/null） |
+| 400 | `auth-invalid-mobile` | 手机号格式不正确 |
+| 429 | `auth-sms-too-frequent` | 60 秒内重复发送（响应带 `retryAfter`） |
+| 429 | `auth-sms-daily-limit` | 当日发送次数达上限（10 次） |
+
+### 2 · `POST /api/auth/login` —— 登录 / 注册
+
+```jsonc
+// 请求（验证码登录）
+{ "mobile": "13800138000", "code": "964729" }
+
+// 响应
 {
-  "code": 400,
-  "errCode": "auth-invalid-mobile-type",
-  "errMsg": "手机号必须为字符串类型，收到 array"
+  "code": 200,
+  "message": "注册并登录成功",   // 或 "登录成功"
+  "token": "eyJhbGciOi...",
+  "expiresIn": 604800,
+  "isNewUser": true,
+  "user": { "id": 1, "mobile": "13800138000", "loginCount": 1, ... }
 }
 ```
 
-**错误码一览**：
+**错误码**：
 
-| errCode | 含义 |
-|---|---|
-| `auth-invalid-mobile-type` | 手机号不是字符串（数组/数字/null） |
-| `auth-invalid-mobile` | 手机号格式不正确 |
-| `auth-sms-too-frequent` | 60 秒内重复发送 |
-| `auth-sms-daily-limit` | 当日发送次数达上限（10 次） |
-| `auth-sms-send-failed` | 短信下发异常 |
+| HTTP | errCode | 含义 |
+|---|---|---|
+| 400 | `auth-invalid-code-format` | 验证码格式不对 |
+| 400 | `auth-code-mismatch` | 验证码错误（响应带 `remainingAttempts`） |
+| 400 | `auth-code-locked` | 连错 5 次，验证码已作废 |
+| 400 | `auth-code-invalid-or-expired` | 验证码无效或已过期 |
 
-#### `loginBySms` —— 验证码登录
+> 用户不存在时**自动创建**（注册），`isNewUser` 为 true。
+
+### 3 · `GET /api/user/profile` —— 获取用户资料 🔒
 
 ```jsonc
-// 请求
-{ "action": "loginBySms", "mobile": "13800138000", "code": "123456" }
-
-// 响应（成功）
-{ "code": 200, "message": "登录成功", "result": { "errCode": 0, "token": "...", "tokenExpired": 1776234023000 } }
-
-// 响应（验证码错误，还有次数）
+// 需 Authorization 头
 {
-  "code": 400,
-  "errCode": "auth-code-mismatch",
-  "errMsg": "验证码错误，还可尝试 3 次",
-  "remainingAttempts": 3
-}
-
-// 响应（已锁定）
-{
-  "code": 400,
-  "errCode": "auth-code-locked",
-  "errMsg": "验证码错误次数已达上限（5 次），请重新获取",
-  "remainingAttempts": 0
+  "code": 200,
+  "user": {
+    "id": 1, "mobile": "13800138000", "nickname": "CharLene",
+    "avatar": null, "loginCount": 3, "registerDate": "...",
+    "lastLoginAt": "...", "source": "sms", "points": 30
+  }
 }
 ```
 
-### 2 · `session-audit`（会话健康检查）
+### 4 · `PUT /api/user/profile` —— 更新用户资料 🔒
 
 ```jsonc
-// 请求
-{ "token": "<JWT>" }
+// 请求（仅允许改这三个字段）
+{ "nickname": "CharLene", "avatar": "/uploads/xxx.png" }
 
-// 响应（正常）
+// 响应（含重新签发的 token）
+{ "code": 200, "message": "更新成功", "token": "eyJ...", "user": {...} }
+```
+
+> 服务端维护的字段（`loginCount` / `source` / `points`）**不可通过此接口修改**，
+> 传入会被忽略；只传这些字段会返回 `user-nothing-to-update`。
+
+### 5 · `GET /api/user/session` —— 会话体检 🔒
+
+替代原 `session-audit` 云函数。
+
+```jsonc
 {
   "code": 200,
   "valid": true,
-  "expiresIn": 2871,
-  "expiresSoon": false,
+  "expiresIn": 2871,        // 剩余秒数
+  "expiresSoon": false,      // 剩余 < 600s 时为 true
   "threshold": 600,
-  "uid": "69afe53d...",
-  "deviceCount": 2,
+  "uid": 1,
+  "deviceCount": 1,
   "lastLoginIpMasked": "183.63.*.*"
-}
-
-// 响应（已过期）
-{
-  "code": 200,
-  "valid": false,
-  "expiresIn": 0,
-  "deviceCount": null,
-  "lastLoginIpMasked": null,
-  "reason": "session-token-expired",
-  "message": "登录状态已失效，请重新登录"
 }
 ```
 
-> 纯读接口，不做任何写操作。
-
-### 3 · `ai-agent`（云端能力提供者）
-
-| action | 说明 | 外部依赖 | 默认状态 |
-|---|---|---|---|
-| `chat` | DeepSeek LLM 推理 | 收费 | 🔴 关闭，未配置时返回 `degraded: true` |
-| `tts` | 讯飞语音合成 | 收费 | 🔴 关闭，未配置时返回 `audio: null` |
-| `knowledge` | 本地 `knowledge.json` 检索 | 无 | 🟢 可用 |
-| `clear` | 清除聊天记录 | 无 | 🟢 可用 |
+### 6 · `POST /api/agent/chat` —— 问答（知识库 + 规则）
 
 ```jsonc
 // 请求
-{ "action": "chat", "data": { "messages": [{ "role": "user", "content": "晨洲村有什么好吃的" }] } }
+{ "message": "晨洲村有什么好吃的" }
 
-// 响应（命中知识库，零费用）
+// 响应
 {
   "code": 200,
-  "source": "knowledge-base",
-  "result": { "choices": [{ "message": { "content": "晨洲村被称为中国蚝乡..." } }] }
-}
-
-// 响应（LLM 未启用，已降级）
-{
-  "code": 200,
-  "source": "fallback",
-  "degraded": true,
-  "message": "LLM 未启用，已降级为本地知识库检索"
+  "source": "knowledge-base",   // knowledge-base | llm | fallback
+  "degraded": false,
+  "answer": "广东汕尾晨洲村被称为中国蚝乡...",
+  "result": { "choices": [{ "message": { "content": "..." } }] }
 }
 ```
 
-### 4 · Agent 编排层（前端 API）
+> `source=fallback` 时 `degraded=true`，且返回 `capabilities` 能力清单 ——
+> 不猜测、不编造。
 
-```js
-import { runAgent, getTraces } from '@/agent/core/index'
+### 7 · `POST /api/agent/run` —— 完整编排
 
-// 执行
-const result = await runAgent('我登录了几次现在几点', { user: currentUser })
+复用与前端完全相同的 `agent/` 核心（planner → executor → fallback）。
 
-result.type          // 'tool-result' | 'fallback'
-result.answer        // 聚合后的回答文本
-result.plan.calls    // [{ tool: 'server-time', args: {...}, confidence: 0.85 }]
-result.results       // [{ tool, args, ok, result, error, durationMs }]
-result.fallback      // 降级时的能力清单
-result.trace         // 本次调用的完整轨迹
+```jsonc
+// 请求
+{ "input": "我登录了几次现在几点" }
 
-// 查看最近的执行轨迹（最多 20 条）
-const traces = getTraces(20)
+// 响应
+{
+  "code": 200,
+  "type": "tool-result",       // tool-result | fallback
+  "answer": "你一共登录了 3 次...",
+  "plan": { "confident": true, "bestConfidence": 0.75, "calls": [...] },
+  "results": [{ "tool": "server-time", "ok": true, "durationMs": 2, ... }],
+  "durationMs": 5
+}
 ```
 
-**工具注册**（前端）：
+### 8 · 业务接口 `/api/business/:name`
 
-```js
-import registry from '@/agent/tools/index'
-import avatarSpeak from '@/agent/tools/avatar-speak'
+`name` 与原 uniCloud 云函数**同名**，保持入参出参形状不变：
 
-registry.register(avatarSpeak.createTool(() => avatarController))
-```
+| 方法 | name | 说明 |
+|---|---|---|
+| GET | `get_villages_list` | 村庄列表 |
+| GET | `get_village_info` | 村庄详情 |
+| GET | `get_food_info` | 美食列表 |
+| GET | `get_shop_goods` | 商城商品 |
+| GET | `get_quiz_questions` | 题库 |
+| GET | `get_user_orders` | 我的订单 |
+| GET | `getCheckInRecords` | 打卡记录 |
+| GET | `getUserCheckedSpots` | 打卡过的地点 |
+| GET | `getUserPhotos` | 我的照片 |
+| POST | `checkIn` | 打卡 |
+| POST | `dailySignIn` | 每日签到 |
+| POST | `quizCheckIn` | 答题打卡 |
+| POST | `gameCheckIn` | 游戏打卡 |
+| POST | `saveUserPhotos` | 保存照片 |
+| POST | `deleteUserPhoto` | 删除照片 |
+| POST | `updateUserPhoto` | 更新照片 |
+| POST | `purchaseItem` | 购买商品 |
+| POST | `userInit` | 用户初始化 |
+| POST | `analyzeFoodPhoto` | 图片识别（本地规则降级） |
+| POST | `upload` | 文件上传（multipart，字段名 `file`） |
 
-### 5 · 数字人控制器（前端 API）
+### 9 · `GET /api/health` —— 健康检查
 
-```js
-import { AvatarController } from '@/digital-avatar/controller/avatar-controller'
-
-controller.speak('你好世界')              // 播报（覆盖式打断）
-controller.speak('你好', { expression: 'happy' })
-controller.stop()                         // 立即打断并复位口型
-controller.setExpression('thinking')      // 切换表情
-controller.getState()                     // { speaking, frameCount, duration, mouthOpenY, ... }
+```jsonc
+{ "code": 200, "message": "服务运行中", "uptime": 123.45, "devMode": true }
 ```
 
 ---
@@ -993,26 +1157,54 @@ node scripts/check-workflow.js # workflow YAML 校验
 
 - `manifest.json` 的 `versionName` / `versionCode` 递增
 - `npm run test:all` 全部通过
-- 提交并打 tag：`git tag -a v1.0.0 -m "..." && git push origin v1.0.0`
+- 提交并打 tag：`git tag -a v2.0.0 -m "..." && git push origin v2.0.0`
   （推送 tag 会触发 CI）
 
-### 阶段 2 · 生产云空间部署
+### 阶段 2 · 后端部署
 
-1. **创建与开发隔离的生产 uniCloud 空间**，右键 `uniCloud-aliyun/` → 关联云服务空间
-2. **上传数据库 Schema** → 右键 `database/` → 上传所有 DB Schema
-3. **上传云函数与公共模块** → 右键 `cloudfunctions/` → 上传所有云函数、公共模块
-4. **配置生产密钥**（见下方清单）
-5. **验证生产环境不返回 `devCode`** —— 调用 `auth-gateway.sendSmsCode`，
-   响应中不应出现 `devCode` 字段
+Sprint 5 之后**不再有云空间**，后端就是一个普通的 Node 进程：
 
-**必须替换的生产凭据**：
+1. **准备环境变量**
+   ```bash
+   cd server
+   cp .env.example .env
+   # 编辑 .env，至少替换 JWT_SECRET 并关闭 DEV_MODE
+   ```
+
+2. **安装依赖并初始化数据库**
+   ```bash
+   npm ci --omit=dev
+   npx prisma generate
+   npx prisma db push
+   ```
+
+3. **用进程管理器启动**
+   ```bash
+   # PM2 示例
+   pm2 start src/server.js --name cross-border-api
+   pm2 save && pm2 startup
+   ```
+
+4. **反代与 HTTPS**（Nginx / Caddy 任选，把 3000 端口暴露出去）
+
+5. **验证生产环境不返回 `devCode`**
+   ```bash
+   curl -X POST https://your-domain/api/auth/send-code \
+     -H "Content-Type: application/json" \
+     -d '{"mobile":"13800138000"}'
+   ```
+   响应中**不应出现** `devCode` 字段。
+
+**必须配置的生产环境变量**：
 
 | 配置项 | 文件位置 | 状态 |
 |---|---|---|
-| `tokenSecret` | `uni-id/config.json` | 🔴 **必须替换**，否则 JWT 可伪造 |
-| `requestAuthSecret` | `uni-id/config.json` | 🔴 **必须替换** |
-| `service.sms.smsKey` / `smsSecret` / `templateId` | `uni-id/config.json` | 🔴 真实短信必需 |
-| `dev.simulateSms` | `app-config/config.json` | 🔴 **必须为 `false`** |
+| `JWT_SECRET` | `server/.env` | 🔴 **必须替换**，否则 JWT 可伪造 |
+| `DEV_MODE` | `server/.env` | 🔴 **必须为 `false`** |
+| `PORT` | `server/.env` | 🟡 按需，默认 3000 |
+| `CORS_ORIGIN` | `server/.env` | 🟡 生产建议限定为前端域名 |
+| `DATABASE_URL` | `server/.env` | 🟡 多实例部署时换成共享数据库 |
+| `UPLOAD_DIR` | `server/.env` | 🟡 生产建议挂载持久卷或改用对象存储 |
 
 生成高强度随机串：
 
@@ -1020,51 +1212,68 @@ node scripts/check-workflow.js # workflow YAML 校验
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
-> 🔴 **云端同步删除**：本地删除的 6 个云函数
-> （`getTTSSignature` / `check_feature_status` / `checkinHandler` /
-> `getMapJson` / `getUserOrders` / `uni-id-pages`）
-> **必须到 uniCloud 控制台手动删除**，否则下次「上传所有云函数」会被拉回本地。
+> 🔴 **`server/.env` 已被 `.gitignore` 排除**，绝不能提交。
+> 部署时用环境变量注入（`docker run -e` / systemd `EnvironmentFile` / CI Secrets）。
 
 ### 阶段 3 · APK 打包与签名
 
 见 [Build APK](#build-apk) 章节。演示用公共测试证书，正式上架需自建 keystore。
 
+> ⚠️ 前端 `utils/request.js` 的 `BASE_URL` 需在打包前改为生产域名
+> （或改为读取环境变量，构建时注入）。
+
 ### 阶段 4 · 上线前检查清单
 
-**凭据与配置**
+**后端配置**
 - [ ] 生产响应中无 `devCode`
-- [ ] `tokenSecret` / `requestAuthSecret` 已替换为随机串
-- [ ] `dev.simulateSms` 为 `false`
-- [ ] 源码中无硬编码密钥（CI 会扫描）
+- [ ] `JWT_SECRET` 已替换为随机串
+- [ ] `DEV_MODE` 为 `false`
+- [ ] `CORS_ORIGIN` 已限定为前端域名
+- [ ] 数据库已初始化（`npx prisma db push`）
+- [ ] 上传目录可写且有持久化方案
 
-**功能验证**
+**安全设计（回归验证）**
 - [ ] 验证码 60 秒频控生效（`auth-sms-too-frequent`）
 - [ ] 验证码连错 5 次作废（`auth-code-locked`）
 - [ ] 手机号数组/数字/null 入参返回结构化错误，不崩溃
-- [ ] 路由守卫生效（未登录访问 `pages/choosedaka/*` 跳登录）
-- [ ] `session-audit` 返回 `valid: true`，过期时前端自动处理
+- [ ] JWT 鉴权生效（不带 token 返回 401）
+- [ ] 用户资料接口无法篡改 `loginCount` 等服务端字段
+
+**功能验证**
+- [ ] 登录 → 拿 token → 访问 profile 成功
+- [ ] 路由守卫生效（未登录访问打卡页跳登录）
+- [ ] 会话健康检查返回 `valid: true`
 - [ ] Agent 未知意图走降级，不返回错误工具结果
-- [ ] 数字人开口正常，`stop()` 立即合嘴
+- [ ] 数字人开口正常，停止立即合嘴
 
 **构建与安装**
 - [ ] APK 在 Android 10+ 真机安装不闪退
 - [ ] Android 13+ 正确申请定位权限
-- [ ] 包名符合反向域名规范且不再变更
+- [ ] 包名符合反向域名规范，且已确定不再变更
 - [ ] 签名证书已离线备份
 
 **文档可复现**
-- [ ] README Getting Started 在干净环境可复现
+- [ ] README Getting Started 在干净环境（无任何配置）可复现
 - [ ] `npm run test:all` 全部通过
+- [ ] `cd server && npm run test:api` 全部通过（需后端已启动）
+- [ ] `node scripts/check-workflow.js` 通过
 
 ### 阶段 5 · 分发与反馈
 
 - APK 上传 **GitHub Releases**，README 顶部放 Releases 链接
 - 说明后续应用商店上架需要：企业开发者账号、隐私政策、软件著作权、备案号
+- 隐私政策需逐项说明：定位用于打卡签到，相机与相册用于记录打卡照片
 
-> 隐私政策需逐项说明：定位用于打卡签到，相机与相册用于记录打卡照片。
+### 回滚方案
+
+| 场景 | 操作 |
+|---|---|
+| 后端版本异常 | `pm2 restart` 切回上一版本代码 |
+| 数据库 Schema 变更异常 | 从备份恢复 `dev.db` |
+| APK 有严重缺陷 | 保留已发布版本，在 GitHub Releases 标记为 yanked，重新打包 |
+| 密钥疑似泄露 | **立即轮换**，再排查原因 —— 不要因为想查明原因而延迟轮换 |
 
 ---
-
 ## Future Work
 
 **LLM 适配器落地**

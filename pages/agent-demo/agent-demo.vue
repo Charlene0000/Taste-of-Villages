@@ -148,7 +148,7 @@ export default {
 			this.running = true
 			try {
 				// 从本地存储取当前用户，作为工具的上下文
-				const userInfo = uni.getStorageSync('uni-id-pages-userInfo') || null
+				const userInfo = uni.getStorageSync('app_user_info') || null
 
 				const result = await runAgent(text, {
 					user: userInfo,

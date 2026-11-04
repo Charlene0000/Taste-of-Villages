@@ -37,6 +37,7 @@
 </template>
 
 <script>
+import { businessApi } from '@/utils/auth.js'
 	export default {
 		name: 'DailySignin',
 		props: {
@@ -141,10 +142,10 @@
                 const openid = this.getOpenId();
                 if (!openid) return;
                 try {
-                    const res = await uniCloud.callFunction({ name: 'dailySignIn', data: { action: 'get', openid } });
-                    if (res.result.code === 200) {
-                        this.signedInToday = res.result.data.signedInToday;
-                        this.cycleDay = res.result.data.cycleDay;
+                    const res = await businessApi.dailySignIn({ action: 'get', openid });
+                    if (res.code === 200) {
+                        this.signedInToday = res.data.signedInToday;
+                        this.cycleDay = res.data.cycleDay;
                     }
                 } catch (e) { console.error(e); }
             },
@@ -158,7 +159,7 @@
                         success: (res) => {
                             if (res.confirm) {
                                 uni.navigateTo({
-                                    url: '/uni_modules/uni-id-pages/pages/login/login-withoutpwd?uniIdRedirectUrl=' + encodeURIComponent('/pages/home/show')
+                                    url: '/pages/login/login?redirect=' + encodeURIComponent('/pages/home/show')
                                 });
                             }
                         }
@@ -168,21 +169,21 @@
                 
                 uni.showLoading({title:'签到中...'});
                 try {
-                    const res = await uniCloud.callFunction({ name: 'dailySignIn', data: { action: 'sign', openid } });
-                    if (res.result.code === 200) {
-                        uni.showToast({title: `签到 +${res.result.data.reward}`, icon: 'success'});
+                    const res = await businessApi.dailySignIn({ action: 'sign', openid });
+                    if (res.code === 200) {
+                        uni.showToast({title: `签到 +${res.data.reward}`, icon: 'success'});
                         this.signedInToday = true;
                         this.checkStatus();
-                        this.$emit('signed', res.result.data.newScore);
+                        this.$emit('signed', res.data.newScore);
                     } else {
-                        uni.showToast({title: res.result.message || '签到失败', icon:'none'});
+                        uni.showToast({title: res.message || '签到失败', icon:'none'});
                     }
                 } catch (e) { uni.showToast({title:'网络错误', icon:'none'}); }
                 finally { uni.hideLoading(); }
             },
             getOpenId() {
                 try {
-                    const u = uni.getStorageSync('uni-id-pages-userInfo') || uni.getStorageSync('uni_id_userinfo');
+                    const u = uni.getStorageSync('app_user_info') || uni.getStorageSync('app_user_info');
                     if (u && u._id) return u._id;
                 } catch(e){}
                 return null;

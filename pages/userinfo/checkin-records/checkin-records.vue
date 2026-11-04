@@ -76,6 +76,7 @@
 </template>
 
 <script>
+import { businessApi } from '@/utils/auth.js'
 	export default {
 		data() {
 			return {
@@ -95,33 +96,27 @@
 			},
             async fetchUserScore() {
                 
-                const userInfo = uni.getStorageSync('uni-id-pages-userInfo');
+                const userInfo = uni.getStorageSync('app_user_info');
                 if (userInfo && userInfo._id) {
-                     const res = await uniCloud.callFunction({
-                        name: 'userInit',
-                        data: { openid: userInfo._id } 
-                    });
-                    if (res.result && res.result.data) {
-                        this.totalScore = res.result.data.points;
+                     const res = await businessApi.userInit({ openid: userInfo._id });
+                    if (res && res.data) {
+                        this.totalScore = res.data.points;
                     }
                 }
             },
             async fetchData() {
                 try {
                     this.loading = true;
-                    const userInfo = uni.getStorageSync('uni-id-pages-userInfo');
+                    const userInfo = uni.getStorageSync('app_user_info');
                     if (!userInfo) {
                         uni.showToast({ title: '请先登录', icon: 'none' });
                         return;
                     }
                     
-                    const res = await uniCloud.callFunction({
-                        name: 'getCheckInRecords',
-                        data: { openid: userInfo._id }
-                    });
+                    const res = await businessApi.getCheckInRecords({ openid: userInfo._id });
                     
-                    if (res.result.code === 200) {
-                        this.records = res.result.data;
+                    if (res.code === 200) {
+                        this.records = res.data;
                         
                         
                         this.totalChecked = this.records.filter(r => r.progress > 0).length;

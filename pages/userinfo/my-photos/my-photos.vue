@@ -64,6 +64,8 @@
 </template>
 
 <script>
+import { businessApi } from '@/utils/auth.js'
+import { upload } from '@/utils/request.js'
 export default {
   data() {
     return {
@@ -83,17 +85,14 @@ export default {
     
     async loadPhotosList() {
       try {
-        const userInfo = uni.getStorageSync('uni-id-pages-userInfo') || uni.getStorageSync('uni_id_userinfo');
+        const userInfo = uni.getStorageSync('app_user_info') || uni.getStorageSync('app_user_info');
         if (!userInfo) return;
 
         uni.showLoading({ title: '加载中' });
-        const res = await uniCloud.callFunction({
-            name: 'getUserPhotos',
-            data: { openid: userInfo._id }
-        });
+        const res = await businessApi.getUserPhotos({ openid: userInfo._id });
         
-        if (res.result && res.result.code === 200) {
-            this.photosList = res.result.data.map(p => ({
+        if (res && res.code === 200) {
+            this.photosList = res.data.map(p => ({
                 ...p,
                 date: this.formatTimestamp(p.createTime)
             }));
@@ -117,7 +116,7 @@ export default {
     },
 
     uploadPhoto() {
-      const userInfo = uni.getStorageSync('uni-id-pages-userInfo') || uni.getStorageSync('uni_id_userinfo');
+      const userInfo = uni.getStorageSync('app_user_info') || uni.getStorageSync('app_user_info');
       if (!userInfo) {
           uni.showToast({ title: '请先登录', icon: 'none' });
           return;
@@ -132,15 +131,13 @@ export default {
           
           try {
               
-              const uploadRes = await uniCloud.uploadFile({
-                  filePath: tempFilePath,
-                  cloudPath: `user_photos/${Date.now()}.jpg`
-              });
+              // 上传到本地后端（替代 uniCloud.uploadFile）
+              const uploadRes = await upload(tempFilePath);
               
-              if (!uploadRes.fileID && !uploadRes.url) {
+              if (!uploadRes || !uploadRes.url) {
                   throw new Error('Upload failed');
               }
-              const fileUrl = uploadRes.fileID || uploadRes.url;
+              const fileUrl = uploadRes.url;
 
               
               const newPhoto = {
@@ -150,13 +147,10 @@ export default {
                   createTime: Date.now()
               };
 
-              await uniCloud.callFunction({
-                  name: 'saveUserPhotos',
-                  data: { 
+              await businessApi.saveUserPhotos({ 
                       photos: [newPhoto],
                       openid: userInfo._id
-                  }
-              });
+                  });
 
               uni.showToast({ title: '上传成功', icon: 'success' });
               this.loadPhotosList(); 
@@ -192,13 +186,10 @@ export default {
             uni.showLoading({ title: '保存中' });
             try {
                 
-                await uniCloud.callFunction({
-                    name: 'updateUserPhoto',
-                    data: {
+                await businessApi.updateUserPhoto({
                         _id: photo._id,
                         title: newTitle
-                    }
-                });
+                    });
                 
                 photo.title = newTitle; 
                 uni.showToast({ title: '修改成功', icon: 'success' });
@@ -222,10 +213,7 @@ export default {
             uni.showLoading({ title: '删除中' });
             try {
                 
-                await uniCloud.callFunction({
-                    name: 'deleteUserPhoto',
-                    data: { _id: photo._id }
-                });
+                await businessApi.deleteUserPhoto({ _id: photo._id });
                 
                 this.photosList.splice(index, 1);
                 this.$refs.photoPopup.close(); 

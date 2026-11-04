@@ -4,14 +4,14 @@ unpackage/
 dist/
 build/
 
-# npm 缓存（云函数内）
+# npm 缓存
 .npm-cache/
 npm_cache/
 .npm/
 *.tgz
 
-# HBuilderX 本地配置（含个人云空间绑定信息，不入库）
-.hbuilderx/launch.json
+# HBuilderX 本地配置（含个人配置，不入库）
+.hbuilderx/
 
 # 环境变量与本地密钥（严禁入库）
 .env
@@ -21,7 +21,23 @@ config.local.json
 **/config.local.json
 *.local.json
 
-# 日志与临时文件
+# ===== 后端（server/）=====
+
+# SQLite 数据库文件（本地生成，不入库；schema 见 server/prisma/schema.prisma）
+server/prisma/*.db
+server/prisma/*.db-journal
+server/prisma/*.db-shm
+server/prisma/*.db-wal
+server/prisma/migrations/dev.db*
+
+# 用户上传的文件（运行时生成，不入库）
+server/uploads/
+server/public/uploads/
+
+# Prisma 生成的客户端
+server/node_modules/.prisma/
+
+# ===== 日志与临时文件 =====
 *.log
 npm-debug.log*
 yarn-error.log*
@@ -29,19 +45,19 @@ logs/
 tmp/
 temp/
 
-# 编辑器 / IDE
+# ===== 编辑器 / IDE =====
 .idea/
 .vscode/
 *.swp
 *.swo
 *~
 
-# 操作系统
+# ===== 操作系统 =====
 .DS_Store
 Thumbs.db
 ehthumbs.db
 desktop.ini
 
-# 本地备份（历史版本备份目录，不应进入版本库）
+# ===== 本地备份（历史版本备份目录，不应进入版本库）=====
 .backup/
 **/.backup/

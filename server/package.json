@@ -1,0 +1,40 @@
+{
+  "name": "cross-border-symbiosis-server",
+  "version": "1.0.0",
+  "description": "跨境共生小程序后端 —— Express + Prisma + SQLite，纯本地零配置运行",
+  "main": "src/server.js",
+  "scripts": {
+    "dev": "node src/server.js",
+    "start": "node src/server.js",
+    "db:push": "prisma db push",
+    "db:generate": "prisma generate",
+    "db:reset": "prisma db push --force-reset",
+    "db:studio": "prisma studio",
+    "test": "node tests/run-tests.js",
+    "test:api": "node tests/api.test.js"
+  },
+  "keywords": [
+    "express",
+    "prisma",
+    "sqlite",
+    "jwt",
+    "uni-app"
+  ],
+  "author": "CharLene",
+  "license": "MIT",
+  "dependencies": {
+    "@prisma/client": "^6.2.1",
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^2.5.0"
+  },
+  "devDependencies": {
+    "prisma": "^6.2.1"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
