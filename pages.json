@@ -315,6 +315,12 @@
 			"style": {
 				"navigationBarTitleText": "Agent 演示"
 			}
+		},
+		{
+			"path": "pages/avatar-demo/avatar-demo",
+			"style": {
+				"navigationBarTitleText": "数字人演示"
+			}
 		}
 	],
 	"easycom": {

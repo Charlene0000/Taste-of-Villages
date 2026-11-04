@@ -104,6 +104,8 @@
 
 <script>
 import { runAgent, getTraces, clearTraces } from '@/agent/core/index'
+import registry from '@/agent/tools/index'
+import avatarSpeak from '@/agent/tools/avatar-speak'
 
 export default {
 	data () {
@@ -122,9 +124,19 @@ export default {
 		}
 	},
 	onLoad () {
+		// 注册数字人联动工具（仅前端可用，云函数中不注册）
+		// 该工具让 Agent 在回答时能触发数字人口播
+		registry.register(avatarSpeak.createTool(() => this.avatarController || null))
 		this.refreshTraces()
 	},
 	methods: {
+		/**
+		 * 取全局共享的数字人控制器（若用户在数字人演示页打开过）
+		 */
+		get avatarController () {
+			const app = getApp()
+			return (app && app.globalData && app.globalData.avatarController) || null
+		},
 		usePreset (text) {
 			this.inputText = text
 			this.run()
@@ -138,7 +150,11 @@ export default {
 				// 从本地存储取当前用户，作为工具的上下文
 				const userInfo = uni.getStorageSync('uni-id-pages-userInfo') || null
 
-				const result = await runAgent(text, { user: userInfo })
+				const result = await runAgent(text, {
+					user: userInfo,
+					// 数字人控制器（若在数字人演示页打开则存在）
+					avatarController: this.avatarController || null
+				})
 				this.lastResult = result
 				this.inputText = ''
 				this.refreshTraces()
