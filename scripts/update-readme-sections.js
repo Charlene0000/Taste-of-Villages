@@ -46,7 +46,10 @@ function main () {
 		const next = src.indexOf('\n## ', start + 1)
 		const end = next === -1 ? src.length : next + 1
 
-		src = src.slice(0, start) + content + '\n' + src.slice(end)
+		// 章节源文件与 README 之间保持「一个空行」的间距约定。
+		// 这样脚本可重复执行而不产生差异（幂等），
+		// 避免每次运行都把 README 弄脏。
+		src = src.slice(0, start) + content + '\n\n' + src.slice(end)
 		console.log('✅ 已替换章节: ' + title)
 	}
 

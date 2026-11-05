@@ -81,7 +81,7 @@
 			<text class="section-title">关于</text>
 			<view class="info-card">
 				<text class="about-text">
-					跨境共生小程序 v1.0.0{'\n'}
+					舌尖上的村落 v1.0.0{'\n'}
 					前端 uni-app + 后端 Express + SQLite{'\n'}
 					零付费云依赖，本地即可完整运行
 				</text>

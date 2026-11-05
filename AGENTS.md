@@ -5,7 +5,7 @@
 
 ## 项目一句话
 
-跨境共生小程序 —— 乡村美食打卡应用。
+舌尖上的村落 —— 乡村文旅美食打卡应用。
 **前后端分离架构**：前端 uni-app (Vue 2) + 后端 Node.js/Express + 数据库 SQLite/Prisma。
 **零付费云依赖，不需要注册任何云账号，本地即可完整跑通。**
 
@@ -80,7 +80,7 @@ Sprint 1 设计的六项安全机制，重构后**一条都不能退化**：
 | JWT 鉴权 | `server/src/middleware/auth.js` |
 | 会话健康检查 | `server/src/routes/user.js` → `/api/user/session` |
 
-> 每一项都有对应的契约测试断言（`server/tests/api.test.js`，39 项）。
+> 每一项都有对应的契约测试断言（`server/tests/api.test.js`，61 项）。
 > **改动安全相关代码后必须跑 `npm run test:api`。**
 
 ### 5. 官方模块不改
@@ -108,17 +108,23 @@ npm test
 
 ```bash
 # 前端与共享模块
-npm test                 # JSON 语法校验
+npm test                 # 静态检查（JSON / 残留引用 / Vue 语法 / 模板标签 / 页面注册）
 npm run test:agent       # Agent 编排层单测（53 项）
 npm run test:avatar      # 数字人交互层单测（15 项）
+npm run test:normalizer  # 协议适配层单测（23 项）
+npm run test:list        # 长列表 mixin 单测（13 项）
+npm run test:contract    # API 契约测试（16 项，需后端已启动）
 npm run test:all         # 以上全部
 
 # 后端
 cd server
 npm install              # 首次
 npx prisma db push       # 初始化 SQLite（10 张表）
+node scripts/seed.js     # 导入种子数据（幂等）
 npm run dev              # 启动（3000 端口）
-npm run test:api         # 接口与安全设计测试（39 项，需服务已启动）
+npm test                 # 全部后端测试（自动拉起服务：19 项单测 + 61 项接口测试）
+npm run test:unit        # 缓存与分页单元测试（无需数据库）
+npm run test:api         # 接口与安全设计测试（61 项，需服务已启动）
 
 # CI 配置校验
 node scripts/check-workflow.js
@@ -133,6 +139,12 @@ node scripts/check-workflow.js
 - 业务接口用**聚合路由** `/api/business/:name`，`name` 与原 uniCloud 云函数同名
 - Prisma 客户端用单例：`require('./db').getPrisma()`，不要每次 new
 - 新增表：改 `server/prisma/schema.prisma` → `npx prisma db push` → `npx prisma generate`
+- **静态数据走缓存**：`server/src/utils/cache.js` 提供 TTL + 标签失效 + 并发去重。
+  村庄 / 美食 / 商品 / 题库已接入（标签 `village` / `food` / `shop` / `quiz`）；
+  用户态数据**不进缓存**，改用分页
+- **用户态列表分页**：`server/src/utils/pagination.js`。
+  未传 `page` / `pageSize` 时返回全量（向前兼容），传入后走 `skip/take + count`
+- 写操作后若影响静态数据，调用 `cache.invalidate('village')` 等标签失效
 
 ---
 
@@ -143,6 +155,9 @@ node scripts/check-workflow.js
 - 页面里不要写 URL 字符串，用 `utils/auth.js` 的语义化封装
 - 受保护页面在 `onLoad` 里加 `if (!checkAuth()) return`
 - 真机调试需把 `utils/request.js` 的 `BASE_URL` 改为电脑局域网 IP
+- **长列表页面用 `utils/list-loader.js` mixin**，不要一次性拉全量。
+  方法名按 `listKey` 生成命名空间（`load<Cap>Page` / `loadMore<Cap>` / `reload<Cap>`），
+  同一组件可混入多个实例。配套在后端接口上启用 `page` / `pageSize` 参数
 
 ---
 

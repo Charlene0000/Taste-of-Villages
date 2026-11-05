@@ -224,7 +224,7 @@
 		{
 			"path": "pages/achievements/achievements",
 			"style": {
-				"navigationBarTitleText": "共生勋章",
+				"navigationBarTitleText": "村落勋章",
 				"navigationStyle": "custom"
 			}
 		},

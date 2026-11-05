@@ -17,7 +17,7 @@ const { disconnect } = require('./db')
 const server = app.listen(config.port, () => {
 	console.log('')
 	console.log('  ╭─────────────────────────────────────────────╮')
-	console.log('  │  跨境共生小程序 · 后端服务已启动              │')
+	console.log('  │  舌尖上的村落 · 后端服务已启动              │')
 	console.log('  ╰─────────────────────────────────────────────╯')
 	console.log('')
 	console.log(`  地址      http://localhost:${config.port}`)
