@@ -4,15 +4,15 @@
 
 | Sprint | 主题 | 关键产出 | 提交 |
 |---|---|---|---|
-| **Sprint 0** | 技术债清理 | 隐私数据替换、密钥收敛至 `.env`、死代码删除、仓库工程化 | `13703d6` |
-| **Sprint 1** | 登录增强 | 验证码四项安全修复（CSPRNG / 频控 / 错误锁定 / 严格校验）、会话体检 | `bbe4d01` |
-| **Sprint 2** | Agent 编排层 | `agent/` 完整目录（planner / executor / memory / fallback / trace / 工具注册表 / 双适配器）；53 项单测 | `989d89d` |
-| **Sprint 3** | 数字人交互层 | `digital-avatar/` 完整目录；15 项单测；`avatar-speak` 打通 Agent 联动 | `08e2ed1` |
-| **Sprint 4** | 打包与文档 | APK 配置、GitHub Actions、README、上线手册 | `256aa09` |
-| **Sprint 5** | 脱离 uniCloud | `server/` 独立后端工程；44 处调用全部替换；协议适配层；静态扫描器 | `791097b` |
-| **Sprint 5.1** | 重构断裂修复 | 12 类运行时断裂修复 + 归一化层 + 残留引用扫描器 | `6cb5650` |
-| **Sprint 5.2** | 原生能力与 UI | 地图 / 定位 / 拍照 / 上传 / 返回栏等 12 类前端问题修复 | `8e487ba` |
-| **Sprint 5.3** | 模板防线 | 修复模板截断 + 新增模板标签检查器 | `dc8f735` |
+| **Sprint 0** | 技术债清理 | 隐私数据替换、密钥收敛至 `.env`、死代码删除、仓库工程化 | `6951dc2` |
+| **Sprint 1** | 登录增强 | 验证码四项安全修复（CSPRNG / 频控 / 错误锁定 / 严格校验）、会话体检 | `1011b24` |
+| **Sprint 2** | Agent 编排层 | `agent/` 完整目录（planner / executor / memory / fallback / trace / 工具注册表 / 双适配器）；53 项单测 | `d51eaa0` |
+| **Sprint 3** | 数字人交互层 | `digital-avatar/` 完整目录；15 项单测；`avatar-speak` 打通 Agent 联动 | `e00d7a6` |
+| **Sprint 4** | 打包与文档 | APK 配置、GitHub Actions、README、上线手册 | `22532d7` |
+| **Sprint 5** | 脱离 uniCloud | `server/` 独立后端工程；44 处调用全部替换；协议适配层；静态扫描器 | `571722a` |
+| **Sprint 5.1** | 重构断裂修复 | 12 类运行时断裂修复 + 归一化层 + 残留引用扫描器 | `f118b5b` |
+| **Sprint 5.2** | 原生能力与 UI | 地图 / 定位 / 拍照 / 上传 / 返回栏等 12 类前端问题修复 | `e1d5401` |
+| **Sprint 5.3** | 模板防线 | 修复模板截断 + 新增模板标签检查器 | `ea2f736` |
 | **Sprint 5.4** | 性能优化 | 自研缓存层、长列表分页、前端增量渲染 mixin | 本次提交 |
 
 ### 迭代方法上的两点体会
