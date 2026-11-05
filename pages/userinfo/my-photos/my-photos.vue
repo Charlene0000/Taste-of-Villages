@@ -17,8 +17,9 @@
         Sprint 5.2：区分「加载中 / 未登录 / 空相册 / 加载失败」四种状态
         原实现只有一个 v-if="photosList.length === 0"，
         未登录或加载失败时也显示「相册还是空的」—— 用户会误以为数据丢了。
+        Sprint 5.4：加载态字段改由 listLoaderMixin 提供（photosList* 前缀）。
       -->
-      <view class="empty-state" v-if="loading">
+      <view class="empty-state" v-if="photosListLoading && photosList.length === 0">
         <view class="empty-icon">⏳</view>
         <text class="empty-text">加载中...</text>
         <text class="empty-desc">正在读取你的美食时光</text>
@@ -31,10 +32,10 @@
         <button class="empty-btn" size="mini" @click="goLogin">去登录</button>
       </view>
 
-      <view class="empty-state" v-else-if="loadError">
+      <view class="empty-state" v-else-if="photosListError">
         <view class="empty-icon">😢</view>
         <text class="empty-text">加载失败</text>
-        <text class="empty-desc">{{ loadError }}</text>
+        <text class="empty-desc">{{ photosListError }}</text>
         <button class="empty-btn" size="mini" @click="loadPhotosList">重试</button>
       </view>
 
@@ -66,6 +67,14 @@
             </view>
           </view>
         </view>
+
+        <!-- Sprint 5.4：触底加载状态 -->
+        <view class="load-more" v-if="photosListLoadingMore">
+          <text class="load-more-text">正在加载更多...</text>
+        </view>
+        <view class="load-more" v-else-if="!photosListHasMore && photosListTotal > 0">
+          <text class="load-more-text">已展示全部 {{ photosListTotal }} 张</text>
+        </view>
       </view>
     </view>
     
@@ -91,71 +100,92 @@
 import { businessApi } from '@/utils/auth.js'
 import { upload } from '@/utils/request.js'
 import { checkAuth } from '@/utils/router-guard.js'
+import { listLoaderMixin } from '@/utils/list-loader.js'
+
+/**
+ * Sprint 5.4：长列表增量加载
+ *
+ * 原实现一次性拉取全部照片再渲染 —— 相册是「只增不减」的用户态数据，
+ * 照片越多首屏越慢、DOM 节点越多、弱网下白屏越久。
+ *
+ * 现在改为：分页拉取 + 触底追加，首屏只渲染 PAGE_SIZE 张。
+ */
+const PAGE_SIZE = 12
+
+/**
+ * 时间戳格式化（模块级）
+ *
+ * mixin 的 mapItem 在组件上下文之外执行（它接收的是纯数据），
+ * 因此不能调用 this.formatTimestamp —— 这里抽成独立函数。
+ */
+function formatTimestamp (ts) {
+  if (!ts) return ''
+  const date = new Date(ts)
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
 export default {
+  mixins: [listLoaderMixin({
+    listKey: 'photosList',
+    pageSize: PAGE_SIZE,
+    immediate: false,   // 交由 onShow 触发，避免与页面守卫重复加载
+    fetcher: async (page, pageSize) => {
+      const userInfo = uni.getStorageSync('app_user_info')
+      if (!userInfo) {
+        const err = new Error('请先登录')
+        err.errCode = 'not-logged-in'
+        throw err
+      }
+      return businessApi.getUserPhotos({
+        openid: userInfo._id || userInfo.id,
+        userId: userInfo._id || userInfo.id,
+        page,
+        pageSize
+      })
+    },
+    mapItem: (p) => Object.assign({}, p, {
+      date: formatTimestamp(p.createTime)
+    })
+  })],
   data() {
     return {
       currentPhoto: {},
       photosList: [],
-      // Sprint 5.2：加载状态
-      loading: true,
-      loadError: '',
+      // Sprint 5.2：加载状态（列表加载态由 listLoaderMixin 提供 photosList* 字段）
       isLoggedIn: false
     }
   },
   onLoad() {
     // Sprint 5.1：接入路由守卫（未登录时跳登录页）
     if (!checkAuth({ route: 'pages/userinfo/my-photos/my-photos' })) return
-    this.loadPhotosList()
   },
   onShow() {
-    
-    this.loadPhotosList()
+    if (!checkAuth({ route: 'pages/userinfo/my-photos/my-photos' })) return
+    this.loadPhotosList();
+  },
+  onReachBottom() {
+    // 触底加载下一页
+    this.loadMorePhotosList();
   },
   methods: {
     
     async loadPhotosList() {
-      this.loading = true;
-      this.loadError = '';
-      try {
-        const userInfo = uni.getStorageSync('app_user_info') || uni.getStorageSync('app_user_info');
-        if (!userInfo) {
-          // Sprint 5.2：未登录 → 显示「请先登录」而不是「相册是空的」
-          this.isLoggedIn = false;
-          this.photosList = [];
-          console.warn('[my-photos] 未登录，跳过加载');
-          return;
-        }
-        this.isLoggedIn = true;
-
-        uni.showLoading({ title: '加载中' });
-        // Sprint 5.2：用 userId 而不是 openid ——
-        // 后端 resolveUserId 读的是 userId；openid 只是历史命名。
-        const res = await businessApi.getUserPhotos({
-          openid: userInfo._id || userInfo.id,
-          userId: userInfo._id || userInfo.id
-        });
-
-        console.log('[my-photos] 加载结果:', {
-          code: res && res.code,
-          count: res && res.data ? res.data.length : 0
-        });
-
-        if (res && res.code === 200 && Array.isArray(res.data)) {
-            this.photosList = res.data.map(p => ({
-                ...p,
-                date: this.formatTimestamp(p.createTime)
-            }));
-        } else {
-          this.loadError = (res && (res.errMsg || res.message)) || '接口返回异常';
-        }
-      } catch (e) {
-        console.error('加载相册失败:', e)
-        this.loadError = (e && e.message) ? e.message : '网络异常'
-        uni.showToast({ title: '加载失败', icon: 'none' })
-      } finally {
-        this.loading = false;
-        uni.hideLoading();
+      this.photosListError = '';
+      const userInfo = uni.getStorageSync('app_user_info');
+      if (!userInfo) {
+        // Sprint 5.2：未登录 → 显示「请先登录」而不是「相册是空的」
+        this.isLoggedIn = false;
+        this.photosList = [];
+        console.warn('[my-photos] 未登录，跳过加载');
+        return;
       }
+      this.isLoggedIn = true;
+
+      // 分页重载（回到第一页）
+      await this.reloadPhotosList();
     },
 
     /** Sprint 5.2：去登录 */
@@ -274,6 +304,8 @@ export default {
                 await businessApi.deleteUserPhoto({ _id: photo._id });
                 
                 this.photosList.splice(index, 1);
+                // Sprint 5.4：分页模式下总数需同步递减，否则「已展示全部 N 张」计数失真
+                if (this.photosListTotal > 0) this.photosListTotal -= 1;
                 this.$refs.photoPopup.close(); 
                 uni.showToast({ title: '删除成功', icon: 'success' });
             } catch (e) {
@@ -424,6 +456,18 @@ export default {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 15px;
+}
+
+/* Sprint 5.4：触底加载状态条（跨两列） */
+.load-more {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 30rpx 0 10rpx;
+}
+
+.load-more-text {
+  font-size: 24rpx;
+  color: #A1887F;
 }
 
 .photo-item {

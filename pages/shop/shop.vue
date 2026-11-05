@@ -104,9 +104,17 @@
                         <view class="my-item-badge">已拥有</view>
                     </view>
                 </block>
-				<view v-else class="empty-state">
+                <view v-else class="empty-state">
 					<text>背包空空如也~</text>
 					<text class="empty-sub">快去集市看看吧</text>
+				</view>
+
+				<!-- Sprint 5.4：订单触底加载状态 -->
+				<view class="load-more" v-if="myItemsLoadingMore">
+					<text class="load-more-text">正在加载更多...</text>
+				</view>
+				<view class="load-more" v-else-if="!myItemsHasMore && myItemsTotal > 0">
+					<text class="load-more-text">共 {{ myItemsTotal }} 条兑换记录</text>
 				</view>
 			</view>
 
@@ -125,12 +133,30 @@
 import { businessApi } from '@/utils/auth.js'
 import CustomTabBar from '@/components/custom-tab-bar/index.vue'
 import DailySignin from '@/components/daily-signin/daily-signin.vue'
+import { listLoaderMixin } from '@/utils/list-loader.js'
 
 export default {
     components: {
         CustomTabBar,
         DailySignin
     },
+    /**
+     * Sprint 5.4：订单长列表增量加载
+     *
+     * 订单历史会随兑换次数无限增长，原实现一次性拉全量。
+     * 这里用 listLoaderMixin 做分页 + 触底追加。
+     */
+    mixins: [listLoaderMixin({
+        listKey: 'myItems',
+        pageSize: 10,
+        immediate: false,
+        fetcher: (page, pageSize) => businessApi.get_user_orders({
+            openid: this.openid,
+            userId: this.openid,
+            page,
+            pageSize
+        })
+    })],
 	data() {
 		return {
 			openid: '',
@@ -146,6 +172,10 @@ export default {
 	onLoad() {
 		this.checkLogin()
 		this.fetchData()
+	},
+	onReachBottom() {
+		// 仅在「我的背包」标签页触发触底加载
+		if (this.currentTab === 'records') this.loadMoreMyItems();
 	},
 	methods: {
         animatePoints(start, end) {
@@ -200,14 +230,8 @@ export default {
         
         async fetchMyItems() {
             if (!this.openid) return;
-            try {
-                const res = await businessApi.get_user_orders({ openid: this.openid });
-                if (res && res.code === 200) {
-                    this.myItems = res.data || [];
-                }
-            } catch (e) {
-                console.error('Fetch My Items Error:', e);
-            }
+            // Sprint 5.4：订单为「只增不减」的用户态数据，改用分页增量加载
+            await this.reloadMyItems();
         },
 
 		async fetchPoints() {
@@ -695,5 +719,16 @@ export default {
 	font-size: 12px;
 	margin-top: 10px;
 	color: #EFEBE9;
+}
+
+/* Sprint 5.4：订单触底加载状态条 */
+.load-more {
+	text-align: center;
+	padding: 20px 0 10px;
+}
+
+.load-more-text {
+	font-size: 12px;
+	color: #A1887F;
 }
 </style>
