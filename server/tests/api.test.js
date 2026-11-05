@@ -306,6 +306,110 @@ async function run () {
 		assert.strictEqual(r.body.code, 200)
 	})
 
+	// ---------- ⑧·2 Sprint 5.4 · 缓存与分页 ----------
+	console.log('\n【⑧·2 数据缓存与长列表分页】')
+
+	// 先为测试用户造 3 条打卡记录，让分页有真实数据可切
+	const authHeader = { Authorization: 'Bearer ' + token }
+	for (const loc of ['101', '102', '103']) {
+		await req('POST', '/api/business/checkIn', { locationId: loc, address: '测试地址', type: 'photo' }, authHeader)
+	}
+
+	await check('健康检查暴露缓存统计（可观测）', async () => {
+		const r = await req('GET', '/api/health')
+		assert.ok(r.body.cache, '应返回 cache 统计对象')
+		assert.strictEqual(typeof r.body.cache.hits, 'number')
+		assert.strictEqual(typeof r.body.cache.hitRate, 'number')
+	})
+
+	await check('静态数据二次请求命中缓存（命中数递增）', async () => {
+		// 先请求一次把数据装进缓存
+		await req('GET', '/api/business/get_villages_list')
+		const before = await req('GET', '/api/health')
+		await req('GET', '/api/business/get_villages_list')
+		const after = await req('GET', '/api/health')
+		assert.ok(
+			after.body.cache.hits > before.body.cache.hits,
+			`二次请求应命中缓存（${before.body.cache.hits} → ${after.body.cache.hits}）`
+		)
+	})
+
+	await check('缓存命中时返回的数据与首次一致', async () => {
+		const a = await req('GET', '/api/business/get_food_info')
+		const b = await req('GET', '/api/business/get_food_info')
+		assert.deepStrictEqual(
+			b.body.data.map(x => x.id),
+			a.body.data.map(x => x.id),
+			'缓存命中的数据应与首次一致'
+		)
+	})
+
+	await check('用户态列表未传分页参数 → 返回全量（向后兼容）', async () => {
+		const r = await req('GET', '/api/business/getCheckInRecords', null, { Authorization: 'Bearer ' + token })
+		assert.strictEqual(r.status, 200)
+		assert.ok(Array.isArray(r.body.data), 'data 仍须是数组（旧前端零改动）')
+		assert.ok(r.body.page, '应附带 page 元信息')
+		assert.strictEqual(r.body.page.total, r.body.data.length, '未分页时 total 等于返回条数')
+	})
+
+	await check('用户态列表传分页参数 → 返回分页切片与元信息', async () => {
+		const all = await req('GET', '/api/business/getCheckInRecords', null, { Authorization: 'Bearer ' + token })
+		const total = all.body.page.total
+		const paged = await req('GET', '/api/business/getCheckInRecords?page=1&pageSize=1', null, { Authorization: 'Bearer ' + token })
+		assert.strictEqual(paged.status, 200)
+		assert.ok(Array.isArray(paged.body.data))
+		assert.ok(paged.body.data.length <= 1, '每页条数应受 pageSize 限制')
+		assert.strictEqual(paged.body.page.pageSize, 1)
+		assert.strictEqual(paged.body.page.total, total, 'total 应反映全量条数')
+		assert.strictEqual(paged.body.page.hasMore, total > 1, 'hasMore 计算应正确')
+	})
+
+	await check('pageSize 超上限时被截断到 100', async () => {
+		const r = await req('GET', '/api/business/getCheckInRecords?page=1&pageSize=99999', null, { Authorization: 'Bearer ' + token })
+		assert.strictEqual(r.body.page.pageSize, 100)
+	})
+
+	await check('分页越界时返回空数组而非报错', async () => {
+		const r = await req('GET', '/api/business/getCheckInRecords?page=9999&pageSize=10', null, { Authorization: 'Bearer ' + token })
+		assert.strictEqual(r.status, 200)
+		assert.deepStrictEqual(r.body.data, [])
+		assert.strictEqual(r.body.page.hasMore, false)
+	})
+
+	await check('分页切片不重不漏（两页拼接 = 全量）', async () => {
+		const all = await req('GET', '/api/business/getCheckInRecords', null, { Authorization: 'Bearer ' + token })
+		const total = all.body.page.total
+		const p1 = await req('GET', '/api/business/getCheckInRecords?page=1&pageSize=1', null, { Authorization: 'Bearer ' + token })
+		const p2 = await req('GET', '/api/business/getCheckInRecords?page=2&pageSize=1', null, { Authorization: 'Bearer ' + token })
+		const ids = []
+			.concat(p1.body.data.map(x => x.id))
+			.concat(p2.body.data.map(x => x.id))
+		assert.strictEqual(new Set(ids).size, ids.length, '两页之间不应有重复项')
+		assert.strictEqual(ids.length, Math.min(total, 2), '两页应覆盖前两条')
+	})
+
+	await check('照片列表同样支持分页', async () => {
+		const r = await req('GET', '/api/business/getUserPhotos?page=1&pageSize=5', null, { Authorization: 'Bearer ' + token })
+		assert.strictEqual(r.status, 200)
+		assert.ok(Array.isArray(r.body.data))
+		assert.strictEqual(r.body.page.pageSize, 5)
+	})
+
+	await check('订单列表同样支持分页', async () => {
+		const r = await req('GET', '/api/business/get_user_orders?page=1&pageSize=5', null, { Authorization: 'Bearer ' + token })
+		assert.strictEqual(r.status, 200)
+		assert.ok(Array.isArray(r.body.data))
+		assert.strictEqual(r.body.page.pageSize, 5)
+	})
+
+	await check('未登录访问用户态列表返回空数组且带 page 元信息', async () => {
+		const r = await req('GET', '/api/business/getUserPhotos')
+		assert.strictEqual(r.status, 200)
+		assert.deepStrictEqual(r.body.data, [])
+		assert.ok(r.body.page, '应附带 page 元信息')
+		assert.strictEqual(r.body.page.total, 0)
+	})
+
 	// ---------- ⑨ Sprint 5.2 · 本地品鉴引擎 ----------
 	console.log('\n【⑨ 本地品鉴引擎（analyzeFoodPhoto）】')
 

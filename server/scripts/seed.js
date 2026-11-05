@@ -27,6 +27,7 @@ const fs = require('fs')
 const path = require('path')
 
 const { getPrisma } = require('../src/db')
+const cache = require('../src/utils/cache')
 
 const SEED_PATH = path.join(__dirname, '..', 'data', 'seed.json')
 
@@ -156,6 +157,13 @@ async function seed () {
 		商品: await prisma.shopGood.count(),
 		题目: await prisma.quizQuestion.count()
 	}
+
+	// 失效静态数据缓存 —— 种子数据变更后，运行中的实例必须能读到新数据
+	//
+	// 注意：seed 脚本是**独立进程**，与运行中的 server 不共享内存缓存，
+	// 因此这里的失效只对「同进程内复用」的场景生效。
+	// 运行中实例的缓存由 TTL（5 分钟）兜底自动过期，最终一致。
+	cache.invalidate('village', 'food', 'shop', 'quiz')
 
 	console.log('✅ 种子数据导入完成:')
 	console.log(`   村庄 ${counts.村庄} 条 · 美食 ${counts.美食} 条 · 商品 ${counts.商品} 条 · 题目 ${counts.题目} 条`)

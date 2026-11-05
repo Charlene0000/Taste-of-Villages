@@ -1,7 +1,7 @@
 {
-  "name": "cross-border-symbiosis-server",
+  "name": "taste-of-the-village-server",
   "version": "1.0.0",
-  "description": "跨境共生小程序后端 —— Express + Prisma + SQLite，纯本地零配置运行",
+  "description": "舌尖上的村落后端 —— Express + Prisma + SQLite，纯本地零配置运行",
   "main": "src/server.js",
   "scripts": {
     "dev": "node src/server.js",
@@ -11,7 +11,8 @@
     "db:reset": "prisma db push --force-reset",
     "db:studio": "prisma studio",
     "test": "node tests/run-tests.js",
-    "test:api": "node tests/api.test.js"
+    "test:api": "node tests/api.test.js",
+    "test:unit": "node tests/cache-pagination.test.js"
   },
   "keywords": [
     "express",

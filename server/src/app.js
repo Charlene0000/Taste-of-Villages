@@ -12,6 +12,7 @@ const path = require('path')
 const fs = require('fs')
 
 const { config } = require('./config')
+const cache = require('./utils/cache')
 
 const app = express()
 
@@ -53,7 +54,9 @@ app.get('/api/health', (req, res) => {
 		code: 200,
 		message: '服务运行中',
 		uptime: process.uptime(),
-		devMode: config.devMode
+		devMode: config.devMode,
+		// 缓存可观测性：命中率 / 条目数 / 失效次数
+		cache: cache.getStats()
 	})
 })
 

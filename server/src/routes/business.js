@@ -23,8 +23,31 @@ const { requireAuth, optionalAuth } = require('../middleware/auth')
 const { config } = require('../config')
 // Sprint 5.2：本地品鉴引擎（纯本地模拟，零外部依赖）
 const foodReview = require('../services/food-review')
+// Sprint 5.4：数据缓存层 + 分页工具（自研，零外部依赖）
+const cache = require('../utils/cache')
+const { parsePagination, buildPagedResponse } = require('../utils/pagination')
 
 const router = express.Router()
+
+/**
+ * 缓存标签
+ *
+ * 静态基础数据（村庄 / 美食 / 商品 / 题库）读多写极少，
+ * 用 TTL + 标签失效缓存，避免每次请求都打 SQLite。
+ *
+ * 用户态数据（照片 / 订单 / 打卡）**不进缓存**——
+ * 它们随用户操作频繁变化，缓存收益低于失效风险，
+ * 改用「分页收敛负载」来优化。
+ */
+const CACHE_TAG = {
+	VILLAGE: 'village',
+	FOOD: 'food',
+	SHOP: 'shop',
+	QUIZ: 'quiz'
+}
+
+/** 静态基础数据缓存 TTL（秒）—— 种子数据几乎不变，5 分钟足够 */
+const STATIC_CACHE_TTL = 5 * 60 * 1000
 
 /** 从 token 或请求体解析出用户 id（未登录返回 null） */
 function resolveUserId (req) {
@@ -87,90 +110,154 @@ router.post('/upload', upload.single('file'), (req, res) => {
  * 读接口：GET /api/business/:name
  */
 const readHandlers = {
-	/** 村庄列表 */
+	/** 村庄列表（缓存） */
 	async get_villages_list (req) {
 		const prisma = getPrisma()
-		const villages = await prisma.village.findMany()
+		const villages = await cache.wrap(
+			'list:villages',
+			() => prisma.village.findMany(),
+			{ ttl: STATIC_CACHE_TTL, tags: [CACHE_TAG.VILLAGE] }
+		)
 		return { code: 200, data: villages }
 	},
 
-	/** 单个村庄信息 */
+	/** 单个村庄信息（缓存） */
 	async get_village_info (req, res) {
 		const prisma = getPrisma()
 		const { id, slug } = req.query
-		const village = slug
-			? await prisma.village.findUnique({ where: { slug } })
-			: await prisma.village.findUnique({ where: { id: parseInt(id, 10) } })
+		const key = slug ? `village:slug:${slug}` : `village:id:${id}`
+		const village = await cache.wrap(
+			key,
+			() => (slug
+				? prisma.village.findUnique({ where: { slug } })
+				: prisma.village.findUnique({ where: { id: parseInt(id, 10) } })),
+			{ ttl: STATIC_CACHE_TTL, tags: [CACHE_TAG.VILLAGE] }
+		)
 		return { code: 200, data: village }
 	},
 
-	/** 美食信息 */
+	/** 美食信息（缓存） */
 	async get_food_info (req) {
 		const prisma = getPrisma()
-		const foods = await prisma.food.findMany()
+		const foods = await cache.wrap(
+			'list:foods',
+			() => prisma.food.findMany(),
+			{ ttl: STATIC_CACHE_TTL, tags: [CACHE_TAG.FOOD] }
+		)
 		return { code: 200, data: foods }
 	},
 
-	/** 商城商品 */
+	/** 商城商品（缓存） */
 	async get_shop_goods (req) {
 		const prisma = getPrisma()
-		const goods = await prisma.shopGood.findMany()
+		const goods = await cache.wrap(
+			'list:goods',
+			() => prisma.shopGood.findMany(),
+			{ ttl: STATIC_CACHE_TTL, tags: [CACHE_TAG.SHOP] }
+		)
 		return { code: 200, data: goods }
 	},
 
-	/** 答题题库 */
+	/** 答题题库（缓存） */
 	async get_quiz_questions (req) {
 		const prisma = getPrisma()
-		const questions = await prisma.quizQuestion.findMany()
+		const questions = await cache.wrap(
+			'list:quiz',
+			() => prisma.quizQuestion.findMany(),
+			{ ttl: STATIC_CACHE_TTL, tags: [CACHE_TAG.QUIZ] }
+		)
 		return { code: 200, data: questions }
 	},
 
-	/** 用户订单 */
+	/** 用户订单（分页） */
 	async get_user_orders (req) {
 		const prisma = getPrisma()
 		const userId = resolveUserId(req)
-		if (!userId) return { code: 200, data: [] }
-		const orders = await prisma.userOrder.findMany({
-			where: { userId },
-			orderBy: { createTime: 'desc' }
-		})
-		return { code: 200, data: orders }
+		const pagination = parsePagination(req.query)
+		if (!userId) return buildPagedResponse([], pagination, 0)
+
+		const where = { userId }
+
+		const [orders, total] = await Promise.all([
+			prisma.userOrder.findMany({
+				where,
+				orderBy: { createTime: 'desc' },
+				...(pagination.paginated
+					? { skip: pagination.offset, take: pagination.pageSize }
+					: {})
+			}),
+			prisma.userOrder.count({ where })
+		])
+
+		return buildPagedResponse(orders, pagination, total)
 	},
 
-	/** 打卡记录 */
+	/** 打卡记录（分页） */
 	async getCheckInRecords (req) {
 		const prisma = getPrisma()
 		const userId = resolveUserId(req)
-		const places = userId
-			? await prisma.checkInPlace.findMany({
-				where: { userId },
-				orderBy: { createTime: 'desc' }
-			})
-			: []
-		return { code: 200, data: places }
+		const pagination = parsePagination(req.query)
+		if (!userId) return buildPagedResponse([], pagination, 0)
+
+		const where = { userId }
+
+		const [places, total] = await Promise.all([
+			prisma.checkInPlace.findMany({
+				where,
+				orderBy: { createTime: 'desc' },
+				...(pagination.paginated
+					? { skip: pagination.offset, take: pagination.pageSize }
+					: {})
+			}),
+			prisma.checkInPlace.count({ where })
+		])
+
+		return buildPagedResponse(places, pagination, total)
 	},
 
-	/** 用户打卡过的地点 */
+	/** 用户打卡过的地点（分页） */
 	async getUserCheckedSpots (req) {
 		const prisma = getPrisma()
 		const userId = resolveUserId(req)
-		const places = userId
-			? await prisma.checkInPlace.findMany({ where: { userId } })
-			: []
-		return { code: 200, data: places }
+		const pagination = parsePagination(req.query)
+		if (!userId) return buildPagedResponse([], pagination, 0)
+
+		const where = { userId }
+
+		const [places, total] = await Promise.all([
+			prisma.checkInPlace.findMany({
+				where,
+				...(pagination.paginated
+					? { skip: pagination.offset, take: pagination.pageSize }
+					: {})
+			}),
+			prisma.checkInPlace.count({ where })
+		])
+
+		return buildPagedResponse(places, pagination, total)
 	},
 
-	/** 用户照片 */
+	/** 用户照片（分页） */
 	async getUserPhotos (req) {
 		const prisma = getPrisma()
 		const userId = resolveUserId(req)
-		const photos = userId
-			? await prisma.userPhoto.findMany({
-				where: { userId },
-				orderBy: { createTime: 'desc' }
-			})
-			: []
-		return { code: 200, data: photos }
+		const pagination = parsePagination(req.query)
+		if (!userId) return buildPagedResponse([], pagination, 0)
+
+		const where = { userId }
+
+		const [photos, total] = await Promise.all([
+			prisma.userPhoto.findMany({
+				where,
+				orderBy: { createTime: 'desc' },
+				...(pagination.paginated
+					? { skip: pagination.offset, take: pagination.pageSize }
+					: {})
+			}),
+			prisma.userPhoto.count({ where })
+		])
+
+		return buildPagedResponse(photos, pagination, total)
 	}
 }
 
