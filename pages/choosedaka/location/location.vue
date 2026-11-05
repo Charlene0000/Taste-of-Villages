@@ -111,7 +111,7 @@
         </view>
         
         
-        <view style="height: 10        </view>
+        <view style="height: 100px;"></view>
 
         <!--
           Sprint 5.2：定位状态提示
